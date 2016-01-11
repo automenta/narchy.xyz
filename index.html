@@ -1,1 +1,363 @@
-<h1>TEST</h1>
+<h1 id="nalnarchy">NAL/NARchy</h1>
+
+<h2 id="task">TASK</h2>
+
+<p>task ::= [budget] [term] [punct] [tense] [truth]</p>
+
+<ul>
+<li>“.”  belief aka judgment to be remembered</li>
+<li>“!”  goal aka desire to be realized</li>
+<li>“?” question about belief state</li>
+<li>“@” question about goal state</li>
+</ul>
+
+
+
+<h2 id="term">TERM</h2>
+
+
+
+<pre class="prettyprint"><code class=" hljs handlebars"><span class="xml">        <span class="hljs-tag">&lt;<span class="hljs-title">statement</span>&gt;</span> ::= "<span class="hljs-tag">&lt;<span class="hljs-title">"</span>&lt;<span class="hljs-attribute">term</span>&gt;</span> <span class="hljs-tag">&lt;<span class="hljs-title">copula</span>&gt;</span> <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>"&gt;"       // two terms related to each other
+                        | <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>                             // a term can name a statement
+                        | "(^"<span class="hljs-tag">&lt;<span class="hljs-title">word</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"         // an operation to be executed                         
+             <span class="hljs-tag">&lt;<span class="hljs-title">copula</span>&gt;</span> ::= "--&gt;"                              // inheritance
+                        | "<span class="hljs-tag">&lt;<span class="hljs-title">-</span>&gt;</span>"                              // similarity
+                        | "{--"                              // instance
+                        | "--]"                              // property
+                        | "{-]"                              // instance-property
+                        | "==&gt;"                              // implication
+                        | "=/&gt;"                              // predictive implication
+                        | "=|&gt;"                              // concurrent implication
+                        | "=\&gt;"                              // retrospective implication
+                        | "<span class="hljs-tag">&lt;<span class="hljs-title">=</span>&gt;</span>"                              // equivalence
+                        | "<span class="hljs-tag">&lt;/&gt;</span>"                              // predictive equivalence
+                        | "<span class="hljs-tag">&lt;<span class="hljs-title">|</span>&gt;</span>"                              // concurrent equivalence
+               <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> ::= <span class="hljs-tag">&lt;<span class="hljs-title">word</span>&gt;</span>                             // an atomic constant term
+                        | <span class="hljs-tag">&lt;<span class="hljs-title">variable</span>&gt;</span>                         // an atomic variable term
+                        | <span class="hljs-tag">&lt;<span class="hljs-title">compound-term</span>&gt;</span>                    // a term with internal structure
+                        | <span class="hljs-tag">&lt;<span class="hljs-title">statement</span>&gt;</span>                        // a statement can serve as a term
+      <span class="hljs-tag">&lt;<span class="hljs-title">compound-term</span>&gt;</span> ::= "{" <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} "}"         // extensional set
+                        | "[" <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} "]"         // intensional set
+                        | "(&amp;," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"       // extensional intersection
+                        | "(|," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"       // intensional intersection
+                        | "(-," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> "," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> ")"        // extensional difference
+                        | "(~," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> "," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> ")"        // intensional difference
+                        | "(*," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"       // product
+                        | "(/," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"       // extensional image
+                        | "(\," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"       // intensional image
+                        | "(--," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> ")"                  // negation
+                        | "(||," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"      // disjunction
+                        | "(&amp;&amp;," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"      // conjunction
+                        | "(&amp;/," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"      // sequential events
+                        | "(&amp;|," <span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span> {","<span class="hljs-tag">&lt;<span class="hljs-title">term</span>&gt;</span>} ")"      // parallel events
+           <span class="hljs-tag">&lt;<span class="hljs-title">tense</span>&gt;</span> ::= ":/:"            // future event
+                        | ":|:"  // present event
+                        | ":\:"  // past event
+
+              <span class="hljs-tag">&lt;<span class="hljs-title">truth</span>&gt;</span> ::= "%"<span class="hljs-tag">&lt;<span class="hljs-title">frequency</span>&gt;</span>[";"<span class="hljs-tag">&lt;<span class="hljs-title">confidence</span>&gt;</span>]"%" // two numbers in [0,1]x(0,1)
+             <span class="hljs-tag">&lt;<span class="hljs-title">budget</span>&gt;</span> ::= "$"<span class="hljs-tag">&lt;<span class="hljs-title">priority</span>&gt;</span>[";"<span class="hljs-tag">&lt;<span class="hljs-title">durability</span>&gt;</span>]"$"  // two numbers in [0,1]x(0,1)
+               <span class="hljs-tag">&lt;<span class="hljs-title">word</span>&gt;</span> : Unicode string in an arbitrary alphabet
+
+## VARIABLE
+
+ - $X independent variable
+ - #Y dependent variable
+ - ?Z query variable
+ - %A pattern variable
+
+
+## TRUTH = (frequency,confidence)
+Values range in 0..1.0
+
+## BUDGET = (priority, durability, quality)
+Values range in 0..1.0
+
+## CONCEPT
+- Belief, Goal, Question, and Quest Task Tables
+- TermLinks
+- TaskLinks
+- ...
+
+
+
+### Example Usage
+
+* Tim is dead.
+
+  `<span class="hljs-tag">&lt;<span class="hljs-title">{Tim}</span> <span class="hljs-attribute">--</span>&gt;</span> [dead]&gt;.`
+
+* Tim is a human.
+
+  `<span class="hljs-tag">&lt;<span class="hljs-title">{Tim}</span> <span class="hljs-attribute">--</span>&gt;</span> human&gt;.`
+
+* Humans are a lifeform.
+
+  `<span class="hljs-tag">&lt;<span class="hljs-title">human</span> <span class="hljs-attribute">--</span>&gt;</span> lifeform&gt;.`
+
+* Lifeforms are like machines.
+
+  `<span class="hljs-tag">&lt;<span class="hljs-title">lifeform</span> &lt;<span class="hljs-attribute">-</span>&gt;</span> machine&gt;.`
+
+* Tom eats chocolate.
+
+  ```
+  <span class="hljs-tag">&lt;<span class="hljs-title">(*,{Tom},chocolate)</span> <span class="hljs-attribute">--</span>&gt;</span> eat&gt;.
+
+  <span class="hljs-tag">&lt;<span class="hljs-title">{Tom}</span> <span class="hljs-attribute">--</span>&gt;</span> (/,eat,_,chocolate)&gt;.
+
+  <span class="hljs-tag">&lt;<span class="hljs-title">chocolate</span> <span class="hljs-attribute">--</span>&gt;</span> (/,eat,{Tom},_)&gt;.
+  ```
+
+Hey! I'm your first Markdown document in **StackEdit**[^stackedit]. Don't delete me, I'm very helpful! I can be recovered anyway in the **Utils** tab of the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-cog"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Settings** dialog.
+
+----------
+
+
+Documents
+-------------
+
+StackEdit stores your documents in your browser, which means all your documents are automatically saved locally and are accessible **offline!**
+
+&gt; **Note:**
+
+&gt; - StackEdit is accessible offline after the application has been loaded for the first time.
+&gt; - Your local documents are not shared between different browsers or computers.
+&gt; - Clearing your browser's data may **delete all your local documents!** Make sure your documents are synchronized with **Google Drive** or **Dropbox** (check out the [<span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Synchronization](#synchronization) section).
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-file"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Create a document
+
+The document panel is accessible using the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-folder-open"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> button in the navigation bar. You can create a new document by clicking <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-file"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **New document** in the document panel.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-folder-open"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Switch to another document
+
+All your local documents are listed in the document panel. You can switch from one to another by clicking a document in the list or you can toggle documents using <span class="hljs-tag">&lt;<span class="hljs-title">kbd</span>&gt;</span>Ctrl+[<span class="hljs-tag">&lt;/<span class="hljs-title">kbd</span>&gt;</span> and <span class="hljs-tag">&lt;<span class="hljs-title">kbd</span>&gt;</span>Ctrl+]<span class="hljs-tag">&lt;/<span class="hljs-title">kbd</span>&gt;</span>.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-pencil"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Rename a document
+
+You can rename the current document by clicking the document title in the navigation bar.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-trash"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Delete a document
+
+You can delete the current document by clicking <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-trash"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Delete document** in the document panel.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-hdd"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Export a document
+
+You can save the current document to a file by clicking <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-hdd"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Export to disk** from the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-stackedit"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> menu panel.
+
+&gt; **Tip:** Check out the [<span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Publish a document](#publish-a-document) section for a description of the different output formats.
+
+
+----------
+
+
+Synchronization
+-------------------
+
+StackEdit can be combined with <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-gdrive"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Google Drive** and <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-dropbox"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Dropbox** to have your documents saved in the *Cloud*. The synchronization mechanism takes care of uploading your modifications or downloading the latest version of your documents.
+
+&gt; **Note:**
+
+&gt; - Full access to **Google Drive** or **Dropbox** is required to be able to import any document in StackEdit. Permission restrictions can be configured in the settings.
+&gt; - Imported documents are downloaded in your browser and are not transmitted to a server.
+&gt; - If you experience problems saving your documents on Google Drive, check and optionally disable browser extensions, such as Disconnect.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Open a document
+
+You can open a document from <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-gdrive"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Google Drive** or the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-dropbox"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Dropbox** by opening the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Synchronize** sub-menu and by clicking **Open from...**. Once opened, any modification in your document will be automatically synchronized with the file in your **Google Drive** / **Dropbox** account.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Save a document
+
+You can save any document by opening the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Synchronize** sub-menu and by clicking **Save on...**. Even if your document is already synchronized with **Google Drive** or **Dropbox**, you can export it to a another location. StackEdit can synchronize one document with multiple locations and accounts.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Synchronize a document
+
+Once your document is linked to a <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-gdrive"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Google Drive** or a <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-dropbox"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Dropbox** file, StackEdit will periodically (every 3 minutes) synchronize it by downloading/uploading any modification. A merge will be performed if necessary and conflicts will be detected.
+
+If you just have modified your document and you want to force the synchronization, click the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> button in the navigation bar.
+
+&gt; **Note:** The <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> button is disabled when you have no document to synchronize.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Manage document synchronization
+
+Since one document can be synchronized with multiple locations, you can list and manage synchronized locations by clicking <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Manage synchronization** in the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-refresh"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Synchronize** sub-menu. This will let you remove synchronization locations that are associated to your document.
+
+&gt; **Note:** If you delete the file from **Google Drive** or from **Dropbox**, the document will no longer be synchronized with that location.
+
+----------
+
+
+Publication
+-------------
+
+Once you are happy with your document, you can publish it on different websites directly from StackEdit. As for now, StackEdit can publish on **Blogger**, **Dropbox**, **Gist**, **GitHub**, **Google Drive**, **Tumblr**, **WordPress** and on any SSH server.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Publish a document
+
+You can publish your document by opening the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Publish** sub-menu and by choosing a website. In the dialog box, you can choose the publication format:
+
+- Markdown, to publish the Markdown text on a website that can interpret it (**GitHub** for instance),
+- HTML, to publish the document converted into HTML (on a blog for example),
+- Template, to have a full control of the output.
+
+&gt; **Note:** The default template is a simple webpage wrapping your document in HTML format. You can customize it in the **Advanced** tab of the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-cog"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Settings** dialog.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Update a publication
+
+After publishing, StackEdit will keep your document linked to that publication which makes it easy for you to update it. Once you have modified your document and you want to update your publication, click on the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> button in the navigation bar.
+
+&gt; **Note:** The <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> button is disabled when your document has not been published yet.
+
+#### <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> Manage document publication
+
+Since one document can be published on multiple locations, you can list and manage publish locations by clicking <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-upload"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Manage publication** in the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-provider-stackedit"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> menu panel. This will let you remove publication locations that are associated to your document.
+
+&gt; **Note:** If the file has been removed from the website or the blog, the document will no longer be published on that location.
+
+----------
+
+
+Markdown Extra
+--------------------
+
+StackEdit supports **Markdown Extra**, which extends **Markdown** syntax with some nice features.
+
+&gt; **Tip:** You can disable any **Markdown Extra** feature in the **Extensions** tab of the <span class="hljs-tag">&lt;<span class="hljs-title">i</span> <span class="hljs-attribute">class</span>=<span class="hljs-value">"icon-cog"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-title">i</span>&gt;</span> **Settings** dialog.
+
+&gt; **Note:** You can find more information about **Markdown** syntax [here][2] and **Markdown Extra** extension [here][3].
+
+
+### Tables
+
+**Markdown Extra** has a special syntax for tables:
+
+Item     | Value
+-------- | ---
+Computer | $1600
+Phone    | $12
+Pipe     | $1
+
+You can specify column alignment with one or two colons:
+
+| Item     | Value | Qty   |
+| :------- | ----: | :---: |
+| Computer | $1600 |  5    |
+| Phone    | $12   |  12   |
+| Pipe     | $1    |  234  |
+
+
+### Definition Lists
+
+**Markdown Extra** has a special syntax for definition lists too:
+
+Term 1
+Term 2
+:   Definition A
+:   Definition B
+
+Term 3
+
+:   Definition C
+
+:   Definition D
+
+    &gt; part of definition D
+
+
+### Fenced code blocks
+
+GitHub's fenced code blocks are also supported with **Highlight.js** syntax highlighting:
+</span></code></pre>
+
+<p>// Foo <br>
+var bar = 0;</p>
+
+
+
+<pre class="prettyprint"><code class=" hljs asciidoc">
+&gt; *<span class="hljs-strong">*Tip:*</span>* To use *<span class="hljs-strong">*Prettify*</span>* instead of *<span class="hljs-strong">*Highlight.js*</span><span class="hljs-strong">*, just configure the *</span><span class="hljs-strong">*Markdown Extra*</span>* extension in the &lt;i class="icon-cog"&gt;&lt;/i&gt; *<span class="hljs-strong">*Settings*</span>* dialog.
+
+&gt; *<span class="hljs-strong">*Note:*</span>* You can find more information:
+
+&gt; - about *<span class="hljs-strong">*Prettify*</span>* syntax highlighting [here][5],
+&gt; - about *<span class="hljs-strong">*Highlight.js*</span>* syntax highlighting [here][6].
+
+
+### Footnotes
+
+You can create footnotes like this[^footnote].
+
+<span class="hljs-code">  [^footnote]: Here is the *text* of the **footnote**.</span>
+
+
+### SmartyPants
+
+SmartyPants converts ASCII punctuation characters into "smart" typographic punctuation HTML entities. For example:
+
+|                  | ASCII                        | HTML              |
+<span class="hljs-code"> ----------------- | ---------------------------- | ------------------</span>
+| Single backticks | <span class="hljs-smartquote">`'Isn'</span>t this fun?<span class="hljs-emphasis">'`            | '</span>Isn't this fun?' |
+| Quotes           | <span class="hljs-smartquote">`"Isn'</span>t this fun?"<span class="hljs-smartquote">`            | "Isn'</span>t this fun?" |
+| Dashes           | <span class="hljs-code">`-- is en-dash, --- is em-dash`</span> | -- is en-dash, --- is em-dash |
+
+
+### Table of contents
+
+You can insert a table of contents using the marker <span class="hljs-code">`[TOC]`</span>:
+
+<span class="hljs-attribute">[TOC]</span>
+
+
+### MathJax
+
+You can render <span class="hljs-strong">*LaTeX*</span> mathematical expressions using *<span class="hljs-strong">*MathJax*</span><span class="hljs-strong">*, as on [math.stackexchange.com][1]:
+
+</span>The <span class="hljs-strong">*Gamma function*</span> satisfying $\Gamma(n) = (n-1)!\quad\forall n\in\mathbb N$ is via the Euler integral
+
+$$
+\Gamma(z) = \int<span class="hljs-emphasis">_0^\infty t^{z-1}e^{-t}dt\,.
+$$
+
+</span>&gt; *<span class="hljs-strong">*Tip:*</span>* To make sure mathematical expressions are rendered properly on your website, include *<span class="hljs-strong">*MathJax*</span>* into your template:
+</code></pre>
+
+
+
+
+
+<pre class="prettyprint"><code class=" hljs applescript">
+&gt; **Note:** You can find more information <span class="hljs-keyword">about</span> **LaTeX** mathematical expressions [here][<span class="hljs-number">4</span>].
+
+
+<span class="hljs-comment">### UML diagrams</span>
+
+You can also render sequence diagrams like this:
+
+```sequence
+Alice-&gt;Bob: Hello Bob, how are you?
+Note right <span class="hljs-keyword">of</span> Bob: Bob thinks
+Bob<span class="hljs-comment">--&gt;Alice: I am good thanks!</span>
+
+
+
+
+&lt;<span class="hljs-keyword">div</span> <span class="hljs-type">class</span>=<span class="hljs-string">"se-preview-section-delimiter"</span>&gt;&lt;/<span class="hljs-keyword">div</span>&gt;
+</code></pre>
+
+<p>And flow charts like this:</p>
+
+<div class="flow-chart"><svg height="420.43359375" version="1.1" width="188.546875" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="overflow: hidden; position: relative; top: -0.34375px;"><desc style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);">Created with Raphaël 2.1.2</desc><defs style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"><path stroke-linecap="round" d="M5,0 0,2.5 5,5z" id="raphael-marker-block" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></path><marker id="raphael-marker-endblock33-obj8" markerHeight="3" markerWidth="3" orient="auto" refX="1.5" refY="1.5" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#raphael-marker-block" transform="rotate(180 1.5 1.5) scale(0.6,0.6)" stroke-width="1.6667" fill="black" stroke="none" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></use></marker><marker id="raphael-marker-endblock33-obj9" markerHeight="3" markerWidth="3" orient="auto" refX="1.5" refY="1.5" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#raphael-marker-block" transform="rotate(180 1.5 1.5) scale(0.6,0.6)" stroke-width="1.6667" fill="black" stroke="none" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></use></marker><marker id="raphael-marker-endblock33-obj10" markerHeight="3" markerWidth="3" orient="auto" refX="1.5" refY="1.5" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#raphael-marker-block" transform="rotate(180 1.5 1.5) scale(0.6,0.6)" stroke-width="1.6667" fill="black" stroke="none" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></use></marker><marker id="raphael-marker-endblock33-obj12" markerHeight="3" markerWidth="3" orient="auto" refX="1.5" refY="1.5" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#raphael-marker-block" transform="rotate(180 1.5 1.5) scale(0.6,0.6)" stroke-width="1.6667" fill="black" stroke="none" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></use></marker></defs><rect x="0" y="0" width="51.671875" height="37" rx="20" ry="20" fill="#ffffff" stroke="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" stroke-width="2" class="flowchart" id="st" transform="matrix(1,0,0,1,56.9375,24.8867)"></rect><text x="10" y="18.5" text-anchor="start" font-family="sans-serif" font-size="14px" stroke="none" fill="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); text-anchor: start; font-family: sans-serif; font-size: 14px; font-weight: normal;" id="stt" class="flowchartt" font-weight="normal" transform="matrix(1,0,0,1,56.9375,24.8867)"><tspan style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" dy="5.5">Start</tspan></text><rect x="0" y="0" width="110.03125" height="37" rx="0" ry="0" fill="#ffffff" stroke="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" stroke-width="2" class="flowchart" id="op" transform="matrix(1,0,0,1,27.7578,136.7734)"></rect><text x="10" y="18.5" text-anchor="start" font-family="sans-serif" font-size="14px" stroke="none" fill="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); text-anchor: start; font-family: sans-serif; font-size: 14px; font-weight: normal;" id="opt" class="flowchartt" font-weight="normal" transform="matrix(1,0,0,1,27.7578,136.7734)"><tspan style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" dy="5.5">My Operation</tspan></text><path fill="#ffffff" stroke="#000000" d="M39.38671875,19.693359375L0,39.38671875L78.7734375,78.7734375L157.546875,39.38671875L78.7734375,0L0,39.38671875" stroke-width="2" font-family="sans-serif" font-weight="normal" id="cond" class="flowchart" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); font-family: sans-serif; font-weight: normal;" transform="matrix(1,0,0,1,4,227.7734)"></path><text x="44.38671875" y="39.38671875" text-anchor="start" font-family="sans-serif" font-size="14px" stroke="none" fill="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); text-anchor: start; font-family: sans-serif; font-size: 14px; font-weight: normal;" id="condt" class="flowchartt" font-weight="normal" transform="matrix(1,0,0,1,4,227.7734)"><tspan style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" dy="5.51171875">Yes or No?</tspan><tspan dy="18" x="44.38671875" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></tspan></text><rect x="0" y="0" width="46.6875" height="37" rx="20" ry="20" fill="#ffffff" stroke="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" stroke-width="2" class="flowchart" id="e" transform="matrix(1,0,0,1,59.4297,381.4336)"></rect><text x="10" y="18.5" text-anchor="start" font-family="sans-serif" font-size="14px" stroke="none" fill="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); text-anchor: start; font-family: sans-serif; font-size: 14px; font-weight: normal;" id="et" class="flowchartt" font-weight="normal" transform="matrix(1,0,0,1,59.4297,381.4336)"><tspan style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" dy="5.5">End</tspan></text><path fill="none" stroke="#000000" d="M82.7734375,61.88671875C82.7734375,61.88671875,82.7734375,119.79922004323453,82.7734375,133.7683487731456" stroke-width="2" marker-end="url(#raphael-marker-endblock33-obj8)" font-family="sans-serif" font-weight="normal" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); font-family: sans-serif; font-weight: normal;"></path><path fill="none" stroke="#000000" d="M82.7734375,173.7734375C82.7734375,173.7734375,82.7734375,213.42753744125366,82.7734375,224.77387658460066" stroke-width="2" marker-end="url(#raphael-marker-endblock33-obj9)" font-family="sans-serif" font-weight="normal" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); font-family: sans-serif; font-weight: normal;"></path><path fill="none" stroke="#000000" d="M82.7734375,306.546875C82.7734375,306.546875,82.7734375,364.4593762932345,82.7734375,378.4285050231456" stroke-width="2" marker-end="url(#raphael-marker-endblock33-obj10)" font-family="sans-serif" font-weight="normal" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); font-family: sans-serif; font-weight: normal;"></path><text x="87.7734375" y="316.546875" text-anchor="start" font-family="sans-serif" font-size="14px" stroke="none" fill="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); text-anchor: start; font-family: sans-serif; font-size: 14px; font-weight: normal;" font-weight="normal"><tspan style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" dy="5.5">yes</tspan></text><path fill="none" stroke="#000000" d="M161.546875,267.16015625C161.546875,267.16015625,186.546875,267.16015625,186.546875,267.16015625C186.546875,267.16015625,186.546875,111.7734375,186.546875,111.7734375C186.546875,111.7734375,82.7734375,111.7734375,82.7734375,111.7734375C82.7734375,111.7734375,82.7734375,127.14688205718994,82.7734375,133.78268527425826" stroke-width="2" marker-end="url(#raphael-marker-endblock33-obj12)" font-family="sans-serif" font-weight="normal" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); font-family: sans-serif; font-weight: normal;"></path><text x="166.546875" y="257.16015625" text-anchor="start" font-family="sans-serif" font-size="14px" stroke="none" fill="#000000" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0); text-anchor: start; font-family: sans-serif; font-size: 14px; font-weight: normal;" font-weight="normal"><tspan style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);" dy="5.50390625">no</tspan></text></svg></div>
+
+<blockquote>
+  <p><strong>Note:</strong> You can find more information:</p>
+  
+  <ul>
+  <li>about <strong>Sequence diagrams</strong> syntax <a href="http://bramp.github.io/js-sequence-diagrams/">here</a>,</li>
+  <li>about <strong>Flow charts</strong> syntax <a href="http://adrai.github.io/flowchart.js/">here</a>.</li>
+  </ul>
+</blockquote>
+
+
+
+<h3 id="support-stackedit">Support StackEdit</h3>
+
+<p><a href="https://monetizejs.com/authorize?client_id=ESTHdCYOi18iLhhO&amp;summary=true"><img src="https://cdn.monetizejs.com/resources/button-32.png" alt="" title=""></a></p>
