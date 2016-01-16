@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>DefaultTermizer.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.java</a> &gt; <span class="el_source">DefaultTermizer.java</span></div><h1>DefaultTermizer.java</h1><pre class="source lang-java linenums">package nars.java;
+
+import com.gs.collections.api.bimap.MutableBiMap;
+import com.gs.collections.impl.bimap.mutable.HashBiMap;
+import nars.$;
+import nars.Global;
+import nars.term.Term;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import nars.term.variable.Variable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * Created by me on 8/19/15.
+ */
+public class DefaultTermizer implements Termizer {
+
+
+<span class="fc" id="L27">    public static final Atom PACKAGE = Atom.the(&quot;package&quot;);</span>
+<span class="fc" id="L28">    public static final Atom PRIMITIVE = Atom.the(&quot;primitive&quot;);</span>
+<span class="fc" id="L29">    public static final Variable INSTANCE_VAR = $.varDep(&quot;instance&quot;);</span>
+
+<span class="fc" id="L31">    final Map&lt;Package, Term&gt; packages = new HashMap();</span>
+<span class="fc" id="L32">    final Map&lt;Class, Term&gt; classes = new HashMap();</span>
+
+
+<span class="fc" id="L35">    final HashBiMap&lt;Term,Object&gt; instances = new HashBiMap();</span>
+
+    /*final HashMap&lt;Term, Object&gt; instances = new HashMap();
+    final HashMap&lt;Object, Term&gt; objects = new HashMap();*/
+
+<span class="fc" id="L40">    static final Set&lt;Class&gt; classInPackageExclusions = new HashSet() {{</span>
+<span class="fc" id="L41">        add(Class.class);</span>
+<span class="fc" id="L42">        add(Object.class);</span>
+
+        //since autoboxing can be managed, the distinction between boxed and unboxed values should not be seen by reasoner
+<span class="fc" id="L45">        add(Float.class);</span>
+<span class="fc" id="L46">        add(Double.class);</span>
+<span class="fc" id="L47">        add(Boolean.class);</span>
+<span class="fc" id="L48">        add(Long.class);</span>
+<span class="fc" id="L49">        add(Integer.class);</span>
+<span class="fc" id="L50">        add(Short.class);</span>
+<span class="fc" id="L51">        add(Byte.class);</span>
+<span class="fc" id="L52">        add(Class.class);</span>
+<span class="fc" id="L53">    }};</span>
+
+<span class="fc" id="L55">    public DefaultTermizer() {</span>
+<span class="fc" id="L56">        map(NULL, null);</span>
+<span class="fc" id="L57">        map(TRUE, true);</span>
+<span class="fc" id="L58">        map(FALSE, false);</span>
+<span class="fc" id="L59">    }</span>
+
+    public void map(Term x, Object y) {
+<span class="fc" id="L62">        instances.put(x, y);</span>
+<span class="fc" id="L63">    }</span>
+
+    /** dereference a term to an object (but do not un-termize) */
+    @Nullable
+    @Override public Object object(Term t) {
+
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (t == NULL) return null;</span>
+
+<span class="fc" id="L71">        Object x = instances.get(t);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (x == null)</span>
+<span class="nc" id="L73">            return t; /** return the term intance itself */</span>
+
+<span class="fc" id="L75">        return x;</span>
+    }
+
+
+    @Nullable
+    Term obj2term(@Nullable Object o) {
+
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (o == null)</span>
+<span class="nc" id="L83">            return NULL;</span>
+
+
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (o instanceof Term) return (Term)o;</span>
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (o instanceof String)</span>
+<span class="fc" id="L89">            return Atom.quote((String) o);</span>
+
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (o instanceof Boolean)</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            return ((Boolean) o) ? TRUE : FALSE;</span>
+
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (o instanceof Number)</span>
+<span class="fc" id="L95">            return Atom.the((Number) o);</span>
+
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (o instanceof Class) {</span>
+<span class="fc" id="L98">            Class oc = (Class) o;</span>
+
+<span class="fc" id="L100">            Package p = oc.getPackage();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (p != null) {</span>
+
+<span class="fc" id="L103">                Term cterm = termClassInPackage(oc);</span>
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                if (reportClassInPackage(oc)) { //TODO use a method for other class exclusions</span>
+<span class="fc" id="L106">                    Term pkg = packages.get(p);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                    if (pkg == null) {</span>
+<span class="fc" id="L108">                        pkg = termPackage(p);</span>
+<span class="fc" id="L109">                        packages.put(p, pkg);</span>
+<span class="fc" id="L110">                        termClassInPackage(cterm, PACKAGE);</span>
+                    }
+
+                    //TODO add recursive superclass ancestry?
+                }
+
+<span class="fc" id="L116">                return cterm;</span>
+            }
+<span class="fc" id="L118">            return PRIMITIVE;</span>
+        }
+
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (o instanceof int[]) {</span>
+<span class="nc" id="L122">            List&lt;Term&gt; arg = Arrays.stream((int[]) o)</span>
+<span class="nc" id="L123">                    .mapToObj(Atom::the).collect(Collectors.toList());</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">            if (arg.isEmpty()) return EMPTY;</span>
+<span class="nc" id="L125">            return $.p( arg );</span>
+        }
+        //noinspection IfStatementWithTooManyBranches
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (o instanceof Object[]) {</span>
+<span class="fc" id="L129">            List&lt;Term&gt; arg = Arrays.stream((Object[]) o).map(this::term).collect(Collectors.toList());</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (arg.isEmpty()) return EMPTY;</span>
+<span class="fc" id="L131">            return $.p( arg );</span>
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (o instanceof List) {</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (((List)o).isEmpty()) return EMPTY;</span>
+
+            //TODO can this be done with an array to avoid duplicate collection allocation
+
+
+<span class="fc" id="L139">            Collection c = (Collection) o;</span>
+<span class="fc" id="L140">            List&lt;Term&gt; arg = Global.newArrayList(c.size());</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            for (Object x : c) {</span>
+<span class="fc" id="L142">                Term y = term(x);</span>
+<span class="fc" id="L143">                arg.add(y);</span>
+<span class="fc" id="L144">            }</span>
+
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (arg.isEmpty()) return EMPTY;</span>
+
+<span class="fc" id="L148">            return $.p(arg);</span>
+
+        /*} else if (o instanceof Stream) {
+            return Atom.quote(o.toString().substring(17));
+        }*/
+        }
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (o instanceof Set) {</span>
+<span class="nc" id="L155">            Collection&lt;Term&gt; arg = (Collection&lt;Term&gt;) ((Collection) o).stream().map(this::term).collect(Collectors.toList());</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            if (arg.isEmpty()) return EMPTY;</span>
+<span class="nc" id="L157">            return $.sete(arg);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        } else if (o instanceof Map) {</span>
+
+<span class="fc" id="L160">            Map mapo = (Map) o;</span>
+<span class="fc" id="L161">            Set&lt;Term&gt; components = Global.newHashSet(mapo.size());</span>
+<span class="fc" id="L162">            mapo.forEach((k, v) -&gt; {</span>
+
+<span class="fc" id="L164">                Term tv = obj2term(v);</span>
+<span class="fc" id="L165">                Term tk = obj2term(k);</span>
+
+<span class="pc bpc" id="L167" title="2 of 4 branches missed.">                if ((tv != null) &amp;&amp; (tk!=null)) {</span>
+<span class="fc" id="L168">                    components.add(</span>
+<span class="fc" id="L169">                        $.inh(tv, tk)</span>
+                    );
+                }
+<span class="fc" id="L172">            });</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (components.isEmpty()) return EMPTY;</span>
+<span class="fc" id="L174">            return $.sete(components);</span>
+        }
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        else if (o instanceof Method) {</span>
+            //translate the method to an operation term
+<span class="fc" id="L178">            Method m = (Method)o;</span>
+<span class="fc" id="L179">            return $.oper(</span>
+<span class="fc" id="L180">                NALObjects.getMethodOperator(m),</span>
+<span class="fc" id="L181">                getMethodArgVariables(m)</span>
+            );
+        }
+
+<span class="fc" id="L185">        return termInstanceInClassInPackage(o);</span>
+
+
+//        //ensure package is term'ed
+//        String pname = p.getName();
+//        int period = pname.length()-1;
+//        int last = period;
+//        Term child = cterm;
+//        while (( period = pname.lastIndexOf('.', period)) != -1) {
+//            String parname = pname.substring(0, last);
+//            Term parent = packages.get(parname);
+//            if (parent == null) {
+//                parent = Atom.the(parname);
+//                nar.believe( Inheritance.make(child, parent) );
+//                packages.put()
+//                last = period;
+//                child = parent;
+//            }
+//            else {
+//                break;
+//            }
+//        }
+
+
+    }
+
+    private boolean reportClassInPackage(@NotNull Class oc) {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (classInPackageExclusions.contains(oc)) return false;</span>
+
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (Term.class.isAssignableFrom(oc)) return false;</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        return !oc.isPrimitive();</span>
+
+
+    }
+
+
+    /** (#arg1, #arg2, ...), #returnVar */
+    @NotNull
+    private Term[] getMethodArgVariables(@NotNull Method m) {
+
+        //TODO handle static methods which will not receive first variable instance
+
+<span class="fc" id="L227">        String varPrefix = m.getName() + '_';</span>
+<span class="fc" id="L228">        int n = m.getParameterCount();</span>
+<span class="fc" id="L229">        Compound args = $.p(getArgVariables(varPrefix, n));</span>
+
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        return m.getReturnType() == void.class ? new Term[]{</span>
+                INSTANCE_VAR,
+                args
+<span class="fc" id="L234">        } : new Term[]{</span>
+                INSTANCE_VAR,
+                args,
+<span class="fc" id="L237">                $.varDep(varPrefix + &quot;_return&quot;) //return var</span>
+        };
+    }
+
+    @NotNull
+    private Term[] getArgVariables(String prefix, int numParams) {
+<span class="fc" id="L243">        Term[] x = new Term[numParams];</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (int i = 0; i &lt; numParams; i++) {</span>
+<span class="fc" id="L245">            x[i] = $.varDep(prefix + i);</span>
+        }
+<span class="fc" id="L247">        return x;</span>
+    }
+
+    public static Term termClass(@NotNull Class c) {
+<span class="fc" id="L251">        return Atom.the(c.getSimpleName());</span>
+    }
+
+    public static Term termClassInPackage(@NotNull Class c) {
+<span class="fc" id="L255">        return $.p(termPackage(c.getPackage()), termClass(c));</span>
+    }
+
+    public static Term termPackage(@NotNull Package p) {
+        //TODO cache?
+<span class="fc" id="L260">        String[] path = p.getName().split(&quot;\\.&quot;);</span>
+<span class="fc" id="L261">        return $.p(path);</span>
+
+        //return Atom.the(p.getName());
+    }
+
+    public static Term termInstanceInClassInPackage(@NotNull Object o) {
+        //return o.getClass().getName() + '@' + Integer.toHexString(o.hashCode());
+        //return o.getClass() + &quot;_&quot; + System.identityHashCode(o)
+<span class="fc" id="L269">        return $.p(</span>
+<span class="fc" id="L270">                    termPackage(o.getClass().getPackage()),</span>
+<span class="fc" id="L271">                    termClassInPackage(o.getClass()),</span>
+<span class="fc" id="L272">                    Atom.the(System.identityHashCode(o), 36)</span>
+                );
+    }
+
+    @Nullable
+    protected Term termClassInPackage(Term classs, @Deprecated Term packagge) {
+        //TODO ??
+<span class="fc" id="L279">        return null;</span>
+    }
+
+    @Nullable
+    public Term term(@Nullable Object o) {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (o == null) return NULL;</span>
+
+        //        String cname = o.getClass().toString().substring(6) /* &quot;class &quot; */;
+//        int slice = cname.length();
+//
+<span class="fc" id="L289">        Runnable[] post = new Runnable[1];</span>
+
+
+<span class="fc" id="L292">        Term result = obj2termCached(o, post);</span>
+
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (result!=null)</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (post[0]!=null)</span>
+<span class="fc" id="L296">                post[0].run();</span>
+
+<span class="fc" id="L298">        return result;</span>
+
+
+        //TODO decide to use toString or System object id
+        //String instanceName = o.toString();
+//        if (instanceName.length() &gt; slice)
+//            instanceName = instanceName.substring(slice);
+
+        //final Term oterm = Atom.quote(instanceName);
+
+//        Term prevOterm = objects.put(o, oterm);
+        //if (prevOterm == null) {
+
+
+        //}
+//        else {
+//            if (!oterm.equals(prevOterm)) {
+//                //toString value has changed, create similarity to associate
+//                onInstanceChange(oterm, prevOterm);
+//            }
+//        }
+
+        //return oterm;
+    }
+
+    @Nullable
+    public Term obj2termCached(@Nullable Object o, Runnable[] post) {
+
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (o == null) return NULL;</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (o instanceof Term)</span>
+<span class="fc" id="L328">            return ((Term)o);</span>
+
+<span class="fc" id="L330">        MutableBiMap&lt;Object, Term&gt; iii = instances.inverse();</span>
+<span class="fc" id="L331">        Term oe = iii.get(o);</span>
+        //computeifAbsent crashes because it can go recursive
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (oe == null) {</span>
+
+<span class="fc" id="L335">            Term oterm = obj2term(o);</span>
+
+<span class="fc" id="L337">            Term clas = classes.computeIfAbsent(o.getClass(), this::obj2term);</span>
+
+<span class="fc" id="L339">            Term finalClas = clas;</span>
+<span class="fc" id="L340">            post[0] = () -&gt;  onInstanceOfClass(o, oterm, finalClas);</span>
+
+            //instances.put(oterm, o); //reverse
+
+<span class="fc" id="L344">            oe = oterm;</span>
+            try {
+<span class="fc" id="L346">                iii.put(o, oterm);</span>
+            }
+<span class="pc" id="L348">            catch (Exception e) { /* hack */ }</span>
+
+        }
+
+<span class="fc" id="L352">        return oe;</span>
+    }
+
+
+    protected void onInstanceChange(Term oterm, Term prevOterm) {
+
+
+<span class="nc" id="L359">    }</span>
+
+    protected void onInstanceOfClass(Object o, Term oterm, Term clas) {
+
+<span class="fc" id="L363">    }</span>
+
+    @NotNull
+    public static &lt;T extends Term&gt; Map&lt;Atom,T&gt; mapStaticClassFields(@NotNull Class c, @NotNull Function&lt;Field, T&gt; each) {
+<span class="nc" id="L367">        Field[] ff = c.getFields();</span>
+<span class="nc" id="L368">        Map&lt;Atom,T&gt; t = Global.newHashMap(ff.length);</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        for (Field f : ff) {</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">            if (Modifier.isStatic(f.getModifiers())) {</span>
+<span class="nc" id="L371">                T xx = each.apply(f);</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                if (xx!=null) {</span>
+<span class="nc" id="L373">                    t.put($.$(f.getName()), xx);</span>
+                }
+            }
+        }
+<span class="nc" id="L377">        return t;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

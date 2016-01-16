@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PatternCompound.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.meta</a> &gt; <span class="el_source">PatternCompound.java</span></div><h1>PatternCompound.java</h1><pre class="source lang-java linenums">package nars.nal.meta;
+
+import nars.Op;
+import nars.term.Term;
+import nars.term.TermContainer;
+import nars.term.TermVector;
+import nars.term.compound.Compound;
+import nars.term.compound.GenericCompound;
+import nars.term.match.EllipsisTransform;
+import nars.term.transform.FindSubst;
+import org.jetbrains.annotations.NotNull;
+
+public final class PatternCompound extends GenericCompound {
+
+    public final int sizeCached;
+    public final int volCached;
+    public final int structureCached;
+    public final Term[] termsCached;
+    protected final boolean ellipsis;
+
+    private final boolean commutative;
+    private final boolean effectivelyCommutative;
+
+    private final boolean ellipsisTransform;
+
+
+    public PatternCompound(@NotNull Compound seed) {
+<span class="fc" id="L28">        this(seed, (TermVector) seed.subterms());</span>
+<span class="fc" id="L29">    }</span>
+
+    public PatternCompound(@NotNull Compound seed, @NotNull TermVector subterms) {
+<span class="fc" id="L32">        super(seed.op(), seed.relation(), subterms);</span>
+
+<span class="fc" id="L34">        sizeCached = seed.size();</span>
+<span class="fc" id="L35">        structureCached =</span>
+                //seed.structure() &amp; ~(Op.VariableBits);
+<span class="fc" id="L37">                seed.structure() &amp; ~(Op.VAR_PATTERN.bit());</span>
+
+<span class="fc" id="L39">        this.ellipsis = seed.hasEllipsis();</span>
+<span class="fc" id="L40">        this.ellipsisTransform = hasEllipsisTransform(this);</span>
+<span class="fc" id="L41">        this.volCached = seed.volume();</span>
+<span class="fc" id="L42">        this.termsCached = subterms.terms();</span>
+<span class="fc" id="L43">        this.commutative = isCommutative();</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">        this.effectivelyCommutative = isCommutative() &amp;&amp; (size() &gt; 1);</span>
+<span class="fc" id="L45">    }</span>
+
+    public static boolean hasEllipsisTransform(@NotNull TermContainer x) {
+<span class="fc" id="L48">        int xs = x.size();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int i = 0; i &lt; xs; i++)</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (x.term(i) instanceof EllipsisTransform) return true;</span>
+<span class="fc" id="L51">        return false;</span>
+    }
+
+    @Override
+    public boolean hasEllipsis() {
+<span class="nc" id="L56">        return ellipsis;</span>
+    }
+
+    @Override
+    public Term[] terms() {
+<span class="fc" id="L61">        return termsCached;</span>
+    }
+
+    @Override
+    public final int structure() {
+<span class="fc" id="L66">        return structureCached;</span>
+    }
+
+    @Override public boolean match(@NotNull Compound y, @NotNull FindSubst subst) {
+<span class="fc bfc" id="L70" title="All 6 branches covered.">        return canMatch(y) &amp;&amp; (!ellipsis ?</span>
+                ((effectivelyCommutative) ?
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                        subst.matchPermute(this, y) :</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                        subst.matchLinear(this, y)) :</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                subst.matchCompoundWithEllipsis(this, y));</span>
+    }
+
+    public final boolean canMatch(@NotNull Compound y) {
+
+<span class="fc" id="L79">        int yStructure = y.structure();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if ((yStructure | structureCached) != yStructure)</span>
+<span class="fc" id="L81">            return false;</span>
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (!ellipsis) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (sizeCached != y.size())</span>
+<span class="fc" id="L85">                return false;</span>
+        }
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (volCached &gt; y.volume())</span>
+<span class="fc" id="L89">            return false;</span>
+
+
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (!ellipsisTransform) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (relation != y.relation())</span>
+<span class="fc" id="L94">                return false;</span>
+        }
+
+<span class="fc" id="L97">        return true;</span>
+    }
+
+}
+/**
+ * Created by me on 12/26/15.
+ */ //    public static class VariableDependencies extends DirectedAcyclicGraph&lt;Term,String&gt; {
+//
+//
+//        public Op type;
+//
+//        /* primary ==&gt; secondary */
+//        protected void dependency(Term primary, Term secondary) {
+//            addVertex(primary);
+//            addVertex(secondary);
+//            try {
+//                addDagEdge(primary, secondary, &quot;d&quot; + edgeSet().size()+1);
+//            } catch (CycleFoundException e) {
+//                //System.err.println(e);
+//            }
+//        }
+//
+//
+//        public static class PatternVariableIndex extends VarPattern {
+//
+//            public final Compound parent;
+//            public final int index;
+//
+//            public PatternVariableIndex(String id, Compound parent, int index) {
+//                super(id);
+//                this.parent = parent;
+//                this.index = index; //first index
+//            }
+//            public PatternVariableIndex(Variable v, Compound parent) {
+//                this(v.id, parent, parent.indexOf(v));
+//            }
+//
+//            public String toString() {
+//                return super.toString() + &quot; @ &quot; + parent + &quot; index &quot; + index;
+//            }
+//        }
+//
+//        public static class RematchedPatternVariableIndex extends PatternVariableIndex {
+//
+//            public RematchedPatternVariableIndex(PatternVariableIndex i) {
+//                super(i.id + &quot;_&quot;, i.parent, i.index);
+//            }
+//        }
+//
+//
+//        final Map&lt;Variable,PatternVariableIndex&gt; variables = Global.newHashMap();
+//
+//        public VariableDependencies(Compound c, Op varType) {
+//            super(null);
+//
+//            this.type = varType;
+//
+//            c.recurseTerms( (s, p) -&gt; {
+//                boolean existed = !addVertex(s);
+//
+//                if (p == null)
+//                    return; //top level
+//
+//                addVertex(p);
+//
+//                //if (t instanceof Compound) {
+//
+//                //compoundIn.put((Compound)p, (Compound)t);
+//
+//                if (s.op(varType)) {
+//                    if (existed) {
+//                        PatternVariableIndex s0 = variables.get(s);
+//                        s = new RematchedPatternVariableIndex(s0); //shadow variable dependent
+//                        //dependency(s0, s); //variable re-use after first match
+//
+//                        //compound depends on existing variable
+//                        dependency(s0, p);
+//                        dependency(p, s);
+//                    } else {
+//                        //variable depends on existing compound
+//                        PatternVariableIndex ss = new PatternVariableIndex((Variable) s, (Compound) p);
+//                        variables.put((Variable) s, ss);
+//                        dependency(p, ss);
+//                    }
+//                }
+//                else {
+//                    if (s.isCommutative()) {
+//                        //term is commutive
+//                        //delay commutive terms to the 2nd stage
+//                        dependency(Op.Imdex, s);
+//                    } else {
+//
+//                        //term depends on existing compound
+//                        dependency(p, s);
+//                    }
+//                }
+////                }
+////                else {
+////                    if (!t.op(varType)) return;
+////
+////                    varIn.put((Variable) t, (Compound) p);
+////                    compHas.put((Compound)p, (Variable)t);
+////
+////                    try {
+////                        addDagEdge(p, t,  &quot;requries(&quot; + t + &quot;,&quot; + p + &quot;)&quot;);
+////                    } catch (Exception e1) {
+////                        System.err.println(e1);
+////                    }
+////                }
+//            });
+//
+//            Term last = null;
+//            //DepthFirstIterator ii = new DepthFirstIterator(this, c);
+//            Iterator ii = iterator(); //topological
+//            while (ii.hasNext()) last = (Term) ii.next();
+//
+//            //second stage as a shadow node
+//            dependency(last, Op.Imdex);
+//
+//
+//
+//        }
+//    }
+//
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

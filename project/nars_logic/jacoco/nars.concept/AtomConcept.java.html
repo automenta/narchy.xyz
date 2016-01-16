@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>AtomConcept.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.concept</a> &gt; <span class="el_source">AtomConcept.java</span></div><h1>AtomConcept.java</h1><pre class="source lang-java linenums">package nars.concept;
+
+import nars.NAR;
+import nars.bag.Bag;
+import nars.budget.Budget;
+import nars.concept.util.BeliefTable;
+import nars.concept.util.TaskTable;
+import nars.task.Task;
+import nars.term.Term;
+import nars.term.Termed;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Created by me on 9/2/15.
+ */
+public class AtomConcept extends AbstractConcept  {
+
+    protected final Bag&lt;Task&gt; taskLinks;
+    protected final Bag&lt;Termed&gt; termLinks;
+
+
+//    /** creates with no termlink and tasklink ability */
+//    public AtomConcept(Term atom, Budget budget) {
+//        this(atom, budget, new NullBag(), new NullBag());
+//    }
+
+    public AtomConcept(Term atom, Bag&lt;Termed&gt; termLinks, Bag&lt;Task&gt; taskLinks) {
+<span class="fc" id="L29">        super(atom);</span>
+<span class="fc" id="L30">        this.termLinks = termLinks;</span>
+<span class="fc" id="L31">        this.taskLinks = taskLinks;</span>
+<span class="fc" id="L32">    }</span>
+
+
+
+    /**
+     * Task links for indirect processing
+     */
+    @Override
+    public final Bag&lt;Task&gt; getTaskLinks() {
+<span class="fc" id="L41">        return taskLinks;</span>
+    }
+
+    /**
+     * Term links between the term and its components and compounds; beliefs
+     */
+    @Override
+    public final Bag&lt;Termed&gt; getTermLinks() {
+<span class="fc" id="L49">        return termLinks;</span>
+    }
+
+
+    @Nullable
+    @Override
+    public BeliefTable getBeliefs() {
+<span class="fc" id="L56">        return BeliefTable.EMPTY;</span>
+    }
+
+    @Nullable
+    @Override
+    public BeliefTable getGoals() {
+<span class="nc" id="L62">        return BeliefTable.EMPTY;</span>
+    }
+
+    @Nullable
+    @Override
+    public TaskTable getQuestions() {
+<span class="nc" id="L68">        return BeliefTable.EMPTY;</span>
+    }
+
+    @Nullable
+    @Override
+    public TaskTable getQuests() {
+<span class="nc" id="L74">        return BeliefTable.EMPTY;</span>
+    }
+
+    static final String shouldntProcess = &quot;should not have attempted to process task here&quot;;
+
+    @Nullable
+    @Override
+    public Task processBelief(Task task, NAR nar) {
+<span class="nc" id="L82">        throw new RuntimeException(shouldntProcess);</span>
+    }
+    @Nullable
+    @Override
+    public Task processGoal(Task task, NAR nar) {
+<span class="nc" id="L87">        throw new RuntimeException(shouldntProcess);</span>
+    }
+    @Override
+    public boolean processQuestion(Task task, NAR nar) {
+<span class="nc" id="L91">        throw new RuntimeException(shouldntProcess);</span>
+    }
+    @Override
+    public final boolean processQuest(Task task, NAR nar) {
+<span class="fc" id="L95">        return processQuestion(task, nar );</span>
+    }
+
+
+    /** atoms have no termlink templates, they are irreducible */
+    @Nullable
+    @Override public Termed[] getTermLinkTemplates() {
+<span class="fc" id="L102">        return null;</span>
+    }
+
+    /**
+     * when a task is processed, a tasklink
+     * can be created at the concept of its term
+     */
+    @Override public final boolean link(@NotNull Task t, float scale, float minScale, @NotNull NAR nar) {
+
+        //activate tasklink locally
+<span class="fc" id="L112">        Budget taskBudget = t.getBudget();</span>
+
+<span class="fc" id="L114">        taskLinks.put(t, taskBudget, scale);</span>
+
+<span class="fc" id="L116">        Termed[] templates = getTermLinkTemplates();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (templates == null) return false;</span>
+
+<span class="fc" id="L119">        int numTemplates = templates.length;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (numTemplates == 0) return false;</span>
+
+<span class="fc" id="L122">        float subScale = scale / numTemplates;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (subScale &lt; minScale)</span>
+<span class="fc" id="L124">            return false;</span>
+
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (Termed linkTemplate : templates) {</span>
+
+<span class="fc" id="L128">            Concept templateConcept = nar.conceptualize(linkTemplate, taskBudget, subScale);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (templateConcept == null) {</span>
+<span class="nc" id="L130">                continue;</span>
+            }
+
+<span class="fc" id="L133">            linkTemplate(t, templateConcept, taskBudget, minScale, subScale, nar);</span>
+
+        }
+
+        //linkTemplates(t.getBudget(), scale, nar);
+
+<span class="fc" id="L139">        return true;</span>
+    }
+
+    protected final void linkTemplate(Task t, @NotNull Concept target, Budget b, float minScale, float subScale, NAR nar) {
+
+        /** recursively activate the template's task tlink */
+<span class="fc" id="L145">        target.link(t, subScale, minScale, nar);</span>
+
+        /** activate local's termlink to template */
+<span class="fc" id="L148">        termLinks.put(target, b, subScale);</span>
+
+        /** activate (reverse) template's termlink to local */
+<span class="fc" id="L151">        target.getTermLinks().put(this, b, subScale);</span>
+<span class="fc" id="L152">    }</span>
+
+
+    @Nullable
+    @Override
+    public Task process(Task task, NAR nar) {
+<span class="nc" id="L158">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

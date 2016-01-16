@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>SentenceGraph.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.graph</a> &gt; <span class="el_source">SentenceGraph.java</span></div><h1>SentenceGraph.java</h1><pre class="source lang-java linenums">package nars.util.graph;
+
+import nars.NAR;
+import nars.concept.Concept;
+import nars.util.data.ConceptSet;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Stores relationships of certain sentences that relate other concepts
+ * TODO store a set of 'missing' vertices that are not available
+ * when a relation edge is created. then watch for them to appear
+ * TODO when a vertex is removed and the superterm edge still exists,
+ * add it to the missing set.
+ */
+public abstract class SentenceGraph extends ConceptGraph&lt;SentenceGraph.ConceptRelation&gt; {
+
+    @NotNull
+    public final ConceptSet edgeConcepts;
+
+    public static class ConceptRelation {
+        public final Concept edge;
+        public final Concept from;
+        public final Concept to;
+        private final int hash;
+
+<span class="nc" id="L30">        public ConceptRelation(Concept relation, Concept from, Concept to) {</span>
+<span class="nc" id="L31">            edge = relation;</span>
+<span class="nc" id="L32">            this.from = from;</span>
+<span class="nc" id="L33">            this.to = to;</span>
+<span class="nc" id="L34">            hash = Objects.hash(relation, from, to);</span>
+<span class="nc" id="L35">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L39">            return edge.toString();</span>
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+<span class="nc" id="L44">            ConceptRelation other = (ConceptRelation)obj;</span>
+<span class="nc bnc" id="L45" title="All 6 branches missed.">            return edge.equals(other.edge) &amp;&amp; from.equals(other.from) &amp;&amp; to.equals(other.to);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L50">            return hash;</span>
+        }
+    }
+
+
+
+    protected SentenceGraph(@NotNull NAR nar, boolean directed) {
+<span class="nc" id="L57">        super(nar);</span>
+<span class="nc" id="L58">        edgeConcepts = new ConceptSet(nar) {</span>
+
+            /** buffer the concepts until the end of the cycle to help ensure that subterms will also be conceptualized, otherwise edges will fail tot be created */
+<span class="nc" id="L61">            @NotNull</span>
+            List&lt;Concept&gt; toAdd = new ArrayList();
+
+            @Override
+            protected void onCycle() {
+<span class="nc" id="L66">                super.onCycle();</span>
+<span class="nc" id="L67">                toAdd.forEach(SentenceGraph.this::addConcept);</span>
+<span class="nc" id="L68">            }</span>
+
+            @Override
+            public boolean contains(Concept c) {
+<span class="nc" id="L72">                return containsRelation(c);</span>
+            }
+
+            @Override
+            protected boolean onConceptActive(Concept c) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                if (super.onConceptActive(c)) {</span>
+<span class="nc" id="L78">                    toAdd.add(c);</span>
+<span class="nc" id="L79">                    return true;</span>
+                }
+<span class="nc" id="L81">                return false;</span>
+            }
+
+            @Override
+            protected boolean onConceptForget(@NotNull Concept c) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                if (super.onConceptForget(c)) {</span>
+<span class="nc" id="L87">                    ConceptRelation[] cr = getRelations(c);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                    for (ConceptRelation r : cr) {</span>
+<span class="nc" id="L89">                        graph.removeEdge(r);</span>
+                    }
+<span class="nc" id="L91">                    return true;</span>
+                }
+<span class="nc" id="L93">                return false;</span>
+            }
+        };
+<span class="nc" id="L96">    }</span>
+
+    /** if returns true, the two concepts referred by the compound
+     * will be included in the graph.  the concept itself
+     * represents the edge(s) that will be created between them.
+     */
+    abstract boolean containsRelation(Concept c);
+
+
+    /**
+     * create the set of relation edges which represent the relationship
+     * concept.
+     */
+    @NotNull
+    abstract ConceptRelation[] getRelations(Concept c);
+
+    @Override
+    public boolean contains(Concept c) {
+<span class="nc" id="L114">        return graph.containsVertex(c);</span>
+    }
+
+    protected void addConcept(Concept c) {
+<span class="nc" id="L118">        ConceptRelation[] cr = getRelations(c);</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (cr == null) return;</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        for (ConceptRelation r : cr) {</span>
+<span class="nc" id="L121">            graph.addVertex(r.from);</span>
+<span class="nc" id="L122">            graph.addVertex(r.to);</span>
+<span class="nc" id="L123">            graph.addEdge(r.from, r.to, r);</span>
+        }
+<span class="nc" id="L125">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Terms.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term</a> &gt; <span class="el_source">Terms.java</span></div><h1>Terms.java</h1><pre class="source lang-java linenums">package nars.term;
+
+import com.gs.collections.api.block.predicate.primitive.IntObjectPredicate;
+import nars.Global;
+import nars.Op;
+import nars.term.compound.Compound;
+import nars.util.Texts;
+import nars.util.data.sorted.SortedList;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
+import java.util.function.IntPredicate;
+import java.util.function.Predicate;
+
+import static nars.Op.*;
+
+/**
+ * Static utility class for static methods related to Terms
+ * @author me
+ */
+<span class="pc" id="L24">public enum Terms {</span>
+    ;
+<span class="fc" id="L26">    public static final Term[] Empty = new Term[0];</span>
+<span class="fc" id="L27">    public static final IntFunction&lt;Term[]&gt; TermArrayBuilder = Term[]::new;</span>
+
+    public static boolean equalSubTermsInRespectToImageAndProduct(@Nullable Termed a, @Nullable Termed b) {
+
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">        if (a == null || b == null) {</span>
+<span class="nc" id="L32">            return false;</span>
+        }
+
+        //if one is not a compound, then return their equality
+<span class="fc bfc" id="L36" title="All 4 branches covered.">        if (!((a instanceof Compound) &amp;&amp; (b instanceof Compound))) {</span>
+<span class="fc" id="L37">            return a.equals(b);</span>
+        }
+
+<span class="fc" id="L40">        Op o = a.op();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        boolean equalOps = o == b.op();</span>
+
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (equalOps) {</span>
+<span class="pc bfc" id="L44" title="All 3 branches covered.">            switch (o) {</span>
+                case INHERIT:
+<span class="fc" id="L46">                    return equalSubjectPredicateInRespectToImageAndProduct((Compound)a, (Compound)b);</span>
+
+                case SIMILAR:
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                    return equalSubjectPredicateInRespectToImageAndProduct((Compound)a,(Compound)b)</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                            || equalSubjectPredicateInRespectToImageAndProduct((Compound)b, (Compound)a);</span>
+            }
+        }
+
+<span class="fc" id="L54">        Compound A = ((Compound) a);</span>
+<span class="fc" id="L55">        Compound B = ((Compound) b);</span>
+<span class="fc" id="L56">        int aLen = A.size();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (aLen != B.size())</span>
+<span class="fc" id="L58">            return false;</span>
+
+        //match all subterms
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int i = 0; i &lt; aLen; i++) {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (!equalSubTermsInRespectToImageAndProduct(A.term(i), B.term(i)))</span>
+<span class="fc" id="L63">                return false;</span>
+
+        }
+<span class="fc" id="L66">        return true;</span>
+    }
+
+
+    public static boolean equalSubjectPredicateInRespectToImageAndProduct(@NotNull Compound a, @NotNull Compound b) {
+<span class="fc" id="L71">        return equalSubjectPredicateInRespectToImageAndProduct(a, b, true);</span>
+    }
+
+    static boolean equalSubjectPredicateInRespectToImageAndProduct(@NotNull Termed A, @NotNull Termed B, boolean requireEqualImageRelation) {
+
+
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (A.equals(B)) {</span>
+<span class="fc" id="L78">            return true;</span>
+        }
+
+<span class="fc" id="L81">        Term subjA = Statement.subj(A);</span>
+<span class="fc" id="L82">        Term predA = Statement.pred(A);</span>
+<span class="fc" id="L83">        Term subjB = Statement.subj(B);</span>
+<span class="fc" id="L84">        Term predB = Statement.pred(B);</span>
+
+<span class="fc" id="L86">        Term ta = null, tb = null; //the compound term to put itself in the comparison set</span>
+<span class="fc" id="L87">        Term sa = null, sb = null; //the compound term to put its components in the comparison set</span>
+
+<span class="fc bfc" id="L89" title="All 4 branches covered.">        if ((subjA.op(PRODUCT)) &amp;&amp; (predB.op(IMAGE_EXT))) {</span>
+<span class="fc" id="L90">            ta = predA;</span>
+<span class="fc" id="L91">            sa = subjA;</span>
+<span class="fc" id="L92">            tb = subjB;</span>
+<span class="fc" id="L93">            sb = predB;</span>
+        }
+<span class="fc bfc" id="L95" title="All 4 branches covered.">        if ((subjB.op(PRODUCT)) &amp;&amp; (predA.op(IMAGE_EXT))) {</span>
+<span class="fc" id="L96">            ta = subjA;</span>
+<span class="fc" id="L97">            sa = predA;</span>
+<span class="fc" id="L98">            tb = predB;</span>
+<span class="fc" id="L99">            sb = subjB;</span>
+        }
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        if ((predA.op(IMAGE_EXT)) &amp;&amp; (predB.op(IMAGE_EXT))) {</span>
+<span class="fc" id="L102">            ta = subjA;</span>
+<span class="fc" id="L103">            sa = predA;</span>
+<span class="fc" id="L104">            tb = subjB;</span>
+<span class="fc" id="L105">            sb = predB;</span>
+        }
+
+<span class="fc bfc" id="L108" title="All 4 branches covered.">        if ((subjA.op(IMAGE_INT)) &amp;&amp; (subjB.op(IMAGE_INT))) {</span>
+<span class="fc" id="L109">            ta = predA;</span>
+<span class="fc" id="L110">            sa = subjA;</span>
+<span class="fc" id="L111">            tb = predB;</span>
+<span class="fc" id="L112">            sb = subjB;</span>
+        }
+
+<span class="fc bfc" id="L115" title="All 4 branches covered.">        if ((predA.op(PRODUCT)) &amp;&amp; (subjB.op(IMAGE_INT))) {</span>
+<span class="fc" id="L116">            ta = subjA;</span>
+<span class="fc" id="L117">            sa = predA;</span>
+<span class="fc" id="L118">            tb = predB;</span>
+<span class="fc" id="L119">            sb = subjB;</span>
+        }
+<span class="fc bfc" id="L121" title="All 4 branches covered.">        if ((predB.op(PRODUCT)) &amp;&amp; (subjA.op(IMAGE_INT))) {</span>
+<span class="fc" id="L122">            ta = predA;</span>
+<span class="fc" id="L123">            sa = subjA;</span>
+<span class="fc" id="L124">            tb = subjB;</span>
+<span class="fc" id="L125">            sb = predB;</span>
+        }
+
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (ta == null)</span>
+<span class="fc" id="L129">            return false;</span>
+
+
+        //original code did not check relation index equality
+        //https://code.google.com/p/open-nars/source/browse/trunk/nars_core_java/nars/language/CompoundTerm.java
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (requireEqualImageRelation) {</span>
+            //if (sa.op().isImage() &amp;&amp; sb.op().isImage()) {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (((Compound)sa).relation() != ((Compound)sb).relation()) {</span>
+<span class="fc" id="L137">                    return false;</span>
+                }
+            //}
+        }
+
+<span class="fc" id="L142">        return containsAll((Compound) sa, ta, (Compound) sb, tb);</span>
+
+    }
+
+    private static boolean containsAll(@NotNull TermContainer sat, Term ta, @NotNull TermContainer sbt, Term tb) {
+        //set for fast containment check
+<span class="fc" id="L148">        Set&lt;Term&gt; componentsA = sat.toSet();</span>
+<span class="fc" id="L149">        componentsA.add(ta);</span>
+
+        //test A contains B
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (!componentsA.contains(tb))</span>
+<span class="fc" id="L153">            return false;</span>
+
+<span class="fc" id="L155">        Term[] sbtt = sbt.terms();</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        for (Term x : sbtt) {</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (!componentsA.contains(x))</span>
+<span class="fc" id="L158">                return false;</span>
+        }
+
+<span class="nc" id="L161">        return true;</span>
+    }
+
+
+    /** brute-force equality test */
+    public static boolean contains(@NotNull Term[] container, @NotNull Term v) {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (Term e : container)</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (v.equals(e))</span>
+<span class="fc" id="L169">                return true;</span>
+<span class="fc" id="L170">        return false;</span>
+    }
+
+
+    @NotNull
+    public static Term[] reverse(@NotNull Term[] arg) {
+<span class="nc" id="L176">        int l = arg.length;</span>
+<span class="nc" id="L177">        Term[] r = new Term[l];</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        for (int i = 0; i &lt; l; i++) {</span>
+<span class="nc" id="L179">            r[i] = arg[l - i - 1];</span>
+        }
+<span class="nc" id="L181">        return r;</span>
+    }
+
+    public static Term[] toSortedSetArray(@NotNull Term... arg) {
+<span class="fc bfc" id="L185" title="All 4 branches covered.">        switch (arg.length) {</span>
+
+            case 0:
+<span class="fc" id="L188">                return Terms.Empty;</span>
+
+            case 1:
+<span class="fc" id="L191">                return arg; //new Term[] { arg[0] };</span>
+            case 2:
+<span class="fc" id="L193">                Term a = arg[0];</span>
+<span class="fc" id="L194">                Term b = arg[1];</span>
+<span class="fc" id="L195">                int c = a.compareTo(b);</span>
+
+//                if (Global.DEBUG) {
+//                    //verify consistency of compareTo() and equals()
+//                    boolean equal = a.equals(b);
+//                    if ((equal &amp;&amp; (c!=0)) || (!equal &amp;&amp; (c==0))) {
+//                        throw new RuntimeException(&quot;invalid order (&quot; + c + &quot;): &quot; + a + &quot; = &quot; + b);
+//                    }
+//                }
+
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                if (c &lt; 0) return arg; //same as input //new Term[]{a, b};</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                else if (c &gt; 0) return new Term[]{b, a};</span>
+<span class="fc" id="L207">                else /*if (c == 0)*/ return new Term[]{a}; //equal</span>
+
+                //TODO fast sorted array for arg.length == 3
+
+            default:
+                //terms &gt; 2:
+<span class="fc" id="L213">                return new SortedList&lt;&gt;(arg).toArray(TermArrayBuilder);</span>
+        }
+    }
+
+    public static void printRecursive(@NotNull Term x, int level) {
+        //indent
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (int i = 0; i &lt; level; i++)</span>
+<span class="fc" id="L220">            System.out.print(&quot;  &quot;);</span>
+
+<span class="fc" id="L222">        System.out.print(x);</span>
+<span class="fc" id="L223">        System.out.print(&quot; (&quot;);</span>
+<span class="fc" id="L224">        System.out.print(x.op() + &quot;[&quot; + x.getClass().getSimpleName() + &quot;] &quot;);</span>
+<span class="fc" id="L225">        System.out.print(&quot;c&quot; + x.complexity() + &quot;,v&quot; + x.volume() + ' ');</span>
+<span class="fc" id="L226">        System.out.print(Integer.toBinaryString(x.structure()) + ')');</span>
+<span class="fc" id="L227">        System.out.println();</span>
+
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (x instanceof Compound) {</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (Term z : ((Compound&lt;?&gt;) x))</span>
+<span class="fc" id="L231">                printRecursive(z, level + 1);</span>
+        }
+<span class="fc" id="L233">    }</span>
+
+    /**
+     * for printing complex terms as a recursive tree
+     */
+    public static void printRecursive(Term x, @NotNull Consumer&lt;String&gt; c) {
+<span class="nc" id="L239">        printRecursive(x, 0, c);</span>
+<span class="nc" id="L240">    }</span>
+
+    public static void printRecursive(Term x, int level, @NotNull Consumer&lt;String&gt; c) {
+        //indent
+<span class="nc" id="L244">        StringBuilder line = new StringBuilder();</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        for (int i = 0; i &lt; level; i++)</span>
+<span class="nc" id="L246">            line.append(&quot;  &quot;);</span>
+
+<span class="nc" id="L248">        line.append(x);</span>
+
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if (x instanceof Compound) {</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">            for (Term z : ((Compound&lt;?&gt;) x))</span>
+<span class="nc" id="L252">                printRecursive(z, level + 1, c);</span>
+        }
+
+<span class="nc" id="L255">        c.accept(line.toString());</span>
+<span class="nc" id="L256">    }</span>
+
+
+    /**
+     * build a component list from terms
+     *
+     * @return the component list
+     */
+    public static Term[] toArray(Term... t) {
+<span class="nc" id="L265">        return t;</span>
+    }
+
+    public static List&lt;Term&gt; toList(Term[] t) {
+<span class="nc" id="L269">        return Arrays.asList(t);</span>
+    }
+
+    /** makes a set from the array of terms */
+    @NotNull
+    public static Set&lt;Term&gt; toSet(@NotNull Term[] t) {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (t.length == 1)</span>
+<span class="nc" id="L276">            return Collections.singleton(t[0]);</span>
+<span class="nc" id="L277">        Set&lt;Term&gt; l = Global.newHashSet(t.length);</span>
+<span class="nc" id="L278">        Collections.addAll(l, t);</span>
+<span class="nc" id="L279">        return l;</span>
+    }
+
+    @NotNull
+    @SafeVarargs
+    public static &lt;T&gt; Set&lt;T&gt; toSortedSet(@NotNull T... t) {
+
+<span class="nc" id="L286">        int l = t.length;</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (l == 1)</span>
+<span class="nc" id="L288">            return Collections.singleton(t[0]);</span>
+
+<span class="nc" id="L290">        TreeSet&lt;T&gt; s = new TreeSet();</span>
+<span class="nc" id="L291">        Collections.addAll(s, t);</span>
+<span class="nc" id="L292">        return s;</span>
+    }
+
+    public static int maxLevel(@NotNull Term term) {
+<span class="fc" id="L296">        int[] max = {0};</span>
+<span class="fc" id="L297">        term.recurseTerms((t, p) -&gt; {</span>
+<span class="fc" id="L298">            int m = t.op().minLevel;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            if (m &gt; max[0])</span>
+<span class="fc" id="L300">                max[0] = m;</span>
+<span class="fc" id="L301">        });</span>
+<span class="fc" id="L302">        return max[0];</span>
+    }
+
+    @Nullable
+    public static Term[] concat(@Nullable Term[] a, @NotNull Term... b) {
+
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        if (a == null) {</span>
+<span class="nc" id="L309">            return null;</span>
+        }
+
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (a.length == 0) return b;</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (b.length == 0) return a;</span>
+
+<span class="fc" id="L315">        int L = a.length + b.length;</span>
+
+        //TODO apply preventUnnecessaryDeepCopy to more cases
+
+<span class="fc" id="L319">        Term[] arr = new Term[L];</span>
+
+<span class="fc" id="L321">        int l = a.length;</span>
+<span class="fc" id="L322">        System.arraycopy(a, 0, arr, 0, l);</span>
+<span class="fc" id="L323">        System.arraycopy(b, 0, arr, l, b.length);</span>
+
+<span class="fc" id="L325">        return arr;</span>
+    }
+
+    @NotNull
+    public static &lt;T extends Term&gt; Term[] filter(@NotNull T[] input, @NotNull IntObjectPredicate&lt;T&gt; filter) {
+
+<span class="nc" id="L331">        int s = input.length;</span>
+
+<span class="nc" id="L333">        List&lt;Term&gt; l = Global.newArrayList(s);</span>
+
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        for (int i = 0; i &lt; s; i++) {</span>
+<span class="nc" id="L336">            T t = input[i];</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (filter.accept(i, t))</span>
+<span class="nc" id="L338">                l.add(t);</span>
+        }
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        if (l.isEmpty()) return Terms.Empty;</span>
+<span class="nc" id="L341">        return l.toArray(new Term[l.size()]);</span>
+    }
+
+    @NotNull
+    public static Term[] filter(@NotNull Term[] input, @NotNull IntPredicate filter) {
+<span class="nc" id="L346">        return filter(input, (i, t) -&gt; filter.test(i));</span>
+    }
+
+    @NotNull
+    public static Term[] filter(@NotNull Term[] input, @NotNull Predicate&lt;Term&gt; filter) {
+<span class="nc" id="L351">        return filter(input, (i, t) -&gt; filter.test(t));</span>
+    }
+
+    @NotNull
+    public static Term[] toArray(@NotNull Collection&lt;Term&gt; l) {
+<span class="nc" id="L356">        int s = l.size();</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">        if (s == 0)</span>
+<span class="nc" id="L358">            return Terms.Empty;</span>
+<span class="nc" id="L359">        return l.toArray(new Term[s]);</span>
+    }
+
+    @NotNull
+    public static Term[] cloneTermsReplacing(@NotNull Term[] term, Term from, @NotNull Term to) {
+<span class="nc" id="L364">        Term[] y = new Term[term.length];</span>
+<span class="nc" id="L365">        int i = 0;</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        for (Term x : term) {</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">            if (x.equals(from))</span>
+<span class="nc" id="L368">                x = to;</span>
+<span class="nc" id="L369">            y[i++] = x;</span>
+        }
+<span class="nc" id="L371">        return y;</span>
+    }
+
+    /** returns lev distance divided by max(a.length(), b.length() */
+    public static float levenshteinDistancePercent(@NotNull CharSequence a, @NotNull CharSequence b) {
+<span class="fc" id="L376">        float len = Math.max(a.length(), b.length());</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (len == 0) return 0;</span>
+<span class="fc" id="L378">        return Texts.levenshteinDistance(a,b) / len;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,835 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>FindSubst.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.transform</a> &gt; <span class="el_source">FindSubst.java</span></div><h1>FindSubst.java</h1><pre class="source lang-java linenums">package nars.term.transform;
+
+import com.gs.collections.api.map.ImmutableMap;
+import com.gs.collections.api.set.MutableSet;
+import nars.Global;
+import nars.Memory;
+import nars.NAR;
+import nars.Op;
+import nars.term.Term;
+import nars.term.TermContainer;
+import nars.term.Termlike;
+import nars.term.compound.Compound;
+import nars.term.constraint.MatchConstraint;
+import nars.term.match.Ellipsis;
+import nars.term.match.EllipsisMatch;
+import nars.term.match.EllipsisTransform;
+import nars.term.match.ImageMatch;
+import nars.term.variable.CommonVariable;
+import nars.term.variable.Variable;
+import nars.util.version.Versioned;
+import nars.util.version.Versioning;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+
+
+/* recurses a pair of compound term tree's subterms
+across a hierarchy of sequential and permutative fanouts
+where valid matches are discovered, backtracked,
+and collected until power is depleted. */
+public abstract class FindSubst extends Versioning implements Subst {
+
+
+    public final Random random;
+
+    public final Op type;
+
+    /**
+     * variables whose contents are disallowed to equal each other
+     */
+<span class="fc" id="L44">    @Nullable</span>
+    public ImmutableMap&lt;Term, MatchConstraint&gt; constraints = null;
+
+    //public abstract Term resolve(Term t, Substitution s);
+
+    @NotNull
+    public final VarCachedVersionMap xy;
+    @NotNull
+    public final VarCachedVersionMap yx;
+
+    /**
+     * current &quot;y&quot;-term being matched against
+     */
+    @NotNull
+    public final Versioned&lt;Term&gt; term;
+
+    /**
+     * parent, if in subterms
+     */
+    @NotNull
+    public final Versioned&lt;Compound&gt; parent;
+
+
+<span class="fc" id="L67">    public final List&lt;Termutator&gt; termutes = Global.newArrayList();</span>
+
+    public static Ellipsis getFirstEllipsis(@NotNull Compound X) {
+<span class="fc" id="L70">        int xsize = X.size();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        for (int i = 0; i &lt; xsize; i++) {</span>
+<span class="fc" id="L72">            Term xi = X.term(i);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (xi instanceof Ellipsis) {</span>
+<span class="fc" id="L74">                return (Ellipsis) xi;</span>
+            }
+        }
+<span class="nc" id="L77">        return null;</span>
+    }
+
+    /**
+     * @param x a compound which contains one or more ellipsis terms
+     */
+    public static int countNumNonEllipsis(@NotNull Compound x) {
+        //TODO depending on the expression, determine the sufficient # of terms Y must contain
+<span class="fc" id="L85">        return Ellipsis.numNonEllipsisSubterms(x);</span>
+    }
+
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="fc" id="L92">        return &quot;subst:{&quot; +</span>
+<span class="fc" id="L93">                &quot;now:&quot; + now() +</span>
+                &quot;, type:&quot; + type +
+                &quot;, term:&quot; + term +
+                &quot;, parent:&quot; + parent +
+                //&quot;random:&quot; + random +
+                &quot;, xy:&quot; + xy +
+                &quot;, yx:&quot; + yx +
+                '}';
+    }
+
+
+    protected FindSubst(Op type, @NotNull NAR nar) {
+<span class="fc" id="L105">        this(type, nar.memory);</span>
+<span class="fc" id="L106">    }</span>
+
+    protected FindSubst(Op type, @NotNull Memory memory) {
+<span class="fc" id="L109">        this(type, memory.random);</span>
+<span class="fc" id="L110">    }</span>
+
+<span class="fc" id="L112">    protected FindSubst(Op type, Random random) {</span>
+<span class="fc" id="L113">        this.random = random;</span>
+<span class="fc" id="L114">        this.type = type;</span>
+
+<span class="fc" id="L116">        xy = new VarCachedVersionMap(this);</span>
+<span class="fc" id="L117">        yx = new VarCachedVersionMap(this);</span>
+<span class="fc" id="L118">        term = new Versioned(this);</span>
+<span class="fc" id="L119">        parent = new Versioned(this);</span>
+        //branchPower = new Versioned(this);
+
+
+<span class="fc" id="L123">    }</span>
+
+    /**
+     * called each time all variables are satisfied in a unique way
+     */
+    public abstract boolean onMatch();
+//    /**
+//     * called each time a match is not fully successful
+//     */
+//    public void onPartial() {
+//
+//    }
+
+    @Override
+    public void clear() {
+<span class="fc" id="L138">        revert(0);</span>
+<span class="fc" id="L139">        constraints = null;</span>
+<span class="fc" id="L140">    }</span>
+
+
+    @Nullable
+    @Override
+    public Term getXY(Object t) {
+<span class="fc" id="L146">        return xy.getXY(t);</span>
+    }
+
+    @Nullable
+    public Term getYX(Term t) {
+<span class="fc" id="L151">        return yx.getXY(t);</span>
+    }
+
+
+    public final void goSubterm(int index) {
+<span class="nc" id="L156">        term.set(parent.get().term(index));</span>
+<span class="nc" id="L157">    }</span>
+
+    public final void matchAll(@NotNull Term x, @NotNull Term y) {
+<span class="fc" id="L160">        matchAll(x, y, true);</span>
+<span class="fc" id="L161">    }</span>
+
+    /**
+     * setting finish=false allows matching in pieces before finishing
+     */
+    public void matchAll(@NotNull Term x, @NotNull Term y, boolean finish) {
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (match(x, y) &amp;&amp; finish) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (!termutes.isEmpty())</span>
+<span class="fc" id="L169">                matchTermutes();</span>
+            else
+<span class="fc" id="L171">                onMatch(); //no termutations, it matched, we're done</span>
+        }
+<span class="fc" id="L173">    }</span>
+
+    private void matchTermutes() {
+        //repeat until # of termutes stabilizes
+        int termutesPre;
+        //System.out.println(&quot;termutes start&quot;);
+        do {
+            //System.out.println(&quot;  termutes: &quot; + termutes);
+<span class="fc" id="L181">            termutesPre = termutes.size();</span>
+<span class="fc" id="L182">            matchTermutations(0, termutesPre);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        } while (termutes.size() != termutesPre);</span>
+
+<span class="fc" id="L185">        termutes.clear();</span>
+<span class="fc" id="L186">    }</span>
+
+    private void print(String prefix, @Nullable Term a, Term b) {
+<span class="nc" id="L189">        System.out.print(prefix);</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (a != null)</span>
+<span class="nc" id="L191">            System.out.println(&quot; &quot; + a + &quot; ||| &quot; + b);</span>
+        else
+<span class="nc" id="L193">            System.out.println();</span>
+<span class="nc" id="L194">        System.out.println(&quot;     &quot; + this);</span>
+<span class="nc" id="L195">    }</span>
+
+
+    /**
+     * recurses into the next sublevel of the term
+     */
+    public final boolean match(@NotNull Term x, @NotNull Term y) {
+
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (x.equals(y)) {</span>
+<span class="fc" id="L204">            return true;</span>
+        }
+
+        /*if ((--power) &lt; 0)
+            return false;*/
+
+<span class="fc" id="L210">        Op t = type;</span>
+<span class="fc" id="L211">        Op xOp = x.op();</span>
+<span class="fc" id="L212">        Op yOp = y.op();</span>
+
+<span class="fc bfc" id="L214" title="All 4 branches covered.">        if ((xOp == yOp) &amp;&amp; (x instanceof Compound)) {</span>
+<span class="fc" id="L215">            return ((Compound) x).match((Compound) y, this);</span>
+        }
+
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (xOp == t) {</span>
+<span class="fc" id="L219">            return matchXvar((Variable) x, y);</span>
+        }
+
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (yOp == t) {</span>
+<span class="fc" id="L223">            return matchYvar(x, /*(Variable)*/y);</span>
+        }
+
+<span class="fc bfc" id="L226" title="All 4 branches covered.">        if (xOp.isVar() &amp;&amp; yOp.isVar()) {</span>
+<span class="fc" id="L227">            return nextVarX((Variable) x, y);</span>
+        }
+
+<span class="fc" id="L230">        return false;</span>
+    }
+
+    private boolean matchYvar(@NotNull Term x, Term y) {
+<span class="fc" id="L234">        Term ySubst = getYX(y);</span>
+
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (ySubst != null) {</span>
+<span class="nc" id="L237">            return match(x, ySubst); //loop</span>
+        } else {
+<span class="fc" id="L239">            putYX(/*(Variable)*/ y, x);</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (y instanceof CommonVariable) {</span>
+<span class="nc" id="L241">                return putXY(/*(Variable)*/ y, x);</span>
+            }
+<span class="fc" id="L243">            return true;</span>
+        }
+    }
+
+    public boolean matchXvar(@NotNull Variable x, @NotNull Term y) {
+<span class="fc" id="L248">        Term xSubst = getXY(x);</span>
+
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        return (xSubst != null) ?</span>
+<span class="fc" id="L251">                match(xSubst, y) :</span>
+<span class="fc" id="L252">                nextVarX(x, y);</span>
+    }
+
+//    private static void printComparison(int power, Compound cx, Compound cy) {
+//        System.out.println(cx.structureString() + &quot; &quot; + cx.volume() + &quot;\t&quot; + cx);
+//        System.out.println(cy.structureString() + &quot; &quot; + cy.volume() + &quot;\t&quot; + cy);
+//        System.out.println(!cx.impossibleToMatch(cy) + &quot;|&quot; + !cy.impossibleToMatch(cx) + &quot; ---&gt; &quot; + (power &gt;= 0) + &quot; &quot; + power);
+//        System.out.println();
+//    }
+
+
+    private boolean nextVarX(@NotNull Variable xVar, @NotNull Term y) {
+<span class="fc" id="L264">        Op xOp = xVar.op();</span>
+
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (xOp == type) {</span>
+<span class="fc" id="L267">            return putVarX(xVar, y);</span>
+        } else {
+<span class="fc" id="L269">            Op yOp = y.op();</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (yOp == xOp) {</span>
+<span class="fc" id="L271">                return putCommon(xVar, (Variable) y);</span>
+            }
+        }
+
+<span class="fc" id="L275">        return false;</span>
+    }
+
+    @Override
+    public boolean isEmpty() {
+        //throw new RuntimeException(&quot;unimpl&quot;);
+<span class="nc" id="L281">        return xy.isEmpty();</span>
+    }
+
+    public final boolean matchCompoundWithEllipsis(@NotNull Compound X, @NotNull Compound Y) {
+
+<span class="fc" id="L286">        int xsize = X.size();</span>
+
+//        final int numNonpatternVars;
+//        int ellipsisToMatch = Ellipsis.numUnmatchedEllipsis(X, this);
+//        if (ellipsisToMatch == 0) {
+//
+//            int ellipsisTotal = Ellipsis.numEllipsis(X);
+//            if (ellipsisTotal &gt; 0) {
+//                //compute a virtual set of subterms based on an existing Ellipsis match
+//                Term XX = X.substituted(this);
+//                return (match(XX, Y));
+//            }
+//
+//            /** NORMAL: match subterms but do not collect for ellipsis */
+//            if (xsize != Y.size()) {
+//                return false;
+//            }
+//            numNonpatternVars = xsize;
+//        } else {
+//            numNonpatternVars = Ellipsis.countNumNonEllipsis(X);
+//        }
+
+        //TODO see if there is a volume or structural constraint that can terminate early here
+
+
+<span class="fc" id="L311">        Ellipsis e = getFirstEllipsis(X);</span>
+
+<span class="fc" id="L313">        int ysize = Y.size();</span>
+
+//        if (!e.valid(numNonpatternVars, ysize)) {
+//            return false;
+//        }
+
+
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (X.isCommutative()) {</span>
+<span class="fc" id="L321">            return matchEllipsedCommutative(</span>
+                    X, e, Y
+            );
+        } else {
+
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            if (e instanceof EllipsisTransform) {</span>
+                //this involves a special &quot;image ellipsis transform&quot;
+
+<span class="fc" id="L329">                EllipsisTransform et = (EllipsisTransform) e;</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                if (et.from.equals(Op.Imdex)) {</span>
+
+<span class="fc" id="L332">                    Term n = apply(et.to);</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">                    if (n == null)</span>
+<span class="nc" id="L334">                        return false;</span>
+
+                    //the indicated term should be inserted
+                    //at the index location of the image
+                    //being processed. (this is the opposite
+                    //of the other condition of this if { })
+<span class="fc bfc" id="L340" title="All 2 branches covered.">                    if (matchEllipsedLinear(X, e, Y)) {</span>
+<span class="fc" id="L341">                        EllipsisMatch raw = (EllipsisMatch) getXY(e);</span>
+<span class="fc" id="L342">                        xy.put(e, null); //HACK clear it to replace with a new value</span>
+<span class="fc" id="L343">                        return putXY(e, ImageMatch.put(raw.term, n, Y));</span>
+                    }
+<span class="fc" id="L345">                } else {</span>
+<span class="fc" id="L346">                    Term n = apply(et.from);</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                    if (n == null)</span>
+<span class="nc" id="L348">                        return false;</span>
+
+                    //resolving may be possible to defer to substitution if
+                    //Y and et.from are components of ImageShrinkEllipsisMatch
+
+<span class="fc" id="L353">                    int imageIndex = Y.indexOf(n);</span>
+<span class="pc bpc" id="L354" title="1 of 4 branches missed.">                    return ((imageIndex != -1) &amp;&amp; matchEllipsedLinear(X, e, Y)) &amp;&amp;</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                            putXY(e, ImageMatch.take((EllipsisMatch) getXY(e), imageIndex));</span>
+
+                }
+<span class="fc" id="L358">                return false;</span>
+            }
+
+            /** if they are images, they must have same relationIndex */
+<span class="fc bfc" id="L362" title="All 2 branches covered.">            if (X.op().isImage()) { //PRECOMPUTABLE</span>
+
+                //if the ellipsis is normal, then interpret the relationIndex as it is
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                if (countNumNonEllipsis(X) &gt; 0) {</span>
+
+<span class="fc" id="L367">                    int xEllipseIndex = X.indexOf(e);</span>
+<span class="fc" id="L368">                    int xRelationIndex = X.relation();</span>
+<span class="fc" id="L369">                    int yRelationIndex = Y.relation();</span>
+
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                    if (xEllipseIndex &gt;= xRelationIndex) {</span>
+                        //compare relation from beginning as in non-ellipsis case
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                        if (xRelationIndex != yRelationIndex)</span>
+<span class="nc" id="L374">                            return false;</span>
+                    } else {
+                        //compare relation from end
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                        if ((xsize - xRelationIndex) != (ysize - yRelationIndex))</span>
+<span class="fc" id="L378">                            return false;</span>
+                    }
+                } else {
+                    //ignore the location of imdex in the pattern and match everything
+
+                }
+
+            }
+
+<span class="fc" id="L387">            return matchEllipsedLinear(X, e, Y);</span>
+        }
+
+    }
+
+//    private boolean matchEllipsisImage(Compound x, Ellipsis e, Compound y) {
+//        /*  ex:
+//           (M --&gt; (A..B=_..+))
+//        */
+//        putXY(e, new ShadowProduct(x.terms()));
+//        return false;
+//    }
+
+    protected boolean addTermutator(@NotNull Termutator t) {
+
+        //resolve termutator interferences that the addition may cause
+<span class="fc" id="L403">        Termlike a = t.resultKey;</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (int i = 0; i &lt; termutes.size(); i++) {</span>
+<span class="fc" id="L405">            Termutator s = termutes.get(i);</span>
+<span class="fc" id="L406">            Termlike b = s.resultKey;</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">            if (a.equals(b)) {</span>
+                //TODO maybe bifurcate a termutator tree with an OR branch?
+
+                //if exact same conditions, dont add duplicate
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">                if (a.getClass() == b.getClass() &amp;&amp;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">                        s.toString().equals(t.toString()))</span>
+<span class="fc" id="L413">                    return true;</span>
+                else
+                    continue;
+            }
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            if (a.containsTerm((Term) b)) {</span>
+                //insert b before a since it is more specific
+<span class="nc" id="L419">                termutes.add(i, t);</span>
+<span class="nc" id="L420">                return true;</span>
+            } /*else if (b.containsTerm((Term) a)) {
+                //a contained by b; append to end (after a)
+                continue;
+            } */
+
+        }
+
+        //unique, add
+<span class="fc" id="L429">        termutes.add(t);</span>
+<span class="fc" id="L430">        return true;</span>
+    }
+
+    public final boolean matchPermute(@NotNull TermContainer x, @NotNull Compound y) {
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if</span>
+<span class="fc bfc" id="L435" title="All 4 branches covered.">                (((type != Op.VAR_PATTERN &amp;&amp; (0 == (x.structure() &amp; type.bit()))) ||</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">                ((type == Op.VAR_PATTERN) &amp;&amp; !Variable.hasPatternVariable(x))))</span>
+
+        {
+            //SPECIAL CASE: no variables
+<span class="fc" id="L440">            return matchLinear(x, y);</span>
+        }
+
+<span class="fc" id="L443">        return addTermutator(new CommutivePermutations(this, x, y));</span>
+    }
+
+
+    /**
+     * commutive compound match: Y into X which contains one ellipsis
+     * &lt;p&gt;
+     * X pattern contains:
+     * &lt;p&gt;
+     * one unmatched ellipsis (identified)
+     * &lt;p&gt;                    //HACK should not need new list
+     * &lt;p&gt;
+     * zero or more &quot;constant&quot; (non-pattern var) terms
+     * all of which Y must contain
+     * &lt;p&gt;
+     * zero or more (non-ellipsis) pattern variables,
+     * each of which may be matched or not.
+     * matched variables whose resolved values that Y must contain
+     * unmatched variables determine the amount of permutations/combinations:
+     * &lt;p&gt;
+     * if the number of matches available to the ellipse is incompatible with the ellipse requirements, fail
+     * &lt;p&gt;
+     * (total eligible terms) Choose (total - #normal variables)
+     * these are then matched in revertable frames.
+     * &lt;p&gt;
+     * *        proceed to collect the remaining zero or more terms as the ellipse's match using a predicate filter
+     *
+     * @param X the pattern term
+     * @param Y the compound being matched into X
+     */
+    public final boolean matchEllipsedCommutative(@NotNull Compound X, Ellipsis Xellipsis, @NotNull Compound Y) {
+
+        //ALL OF THIS CAN BE PRECOMPUTED
+<span class="fc" id="L476">        Set&lt;Term&gt; xSpecific = Global.newHashSet(0); //Global.newHashSet(0);</span>
+
+        //constant terms which have been verified existing in Y and will not need matched
+<span class="fc" id="L479">        Set&lt;Term&gt; ineligible = Global.newHashSet(0);</span>
+
+<span class="fc" id="L481">        boolean ellipsisMatched = false;</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        for (Term x : X.terms()) {</span>
+
+<span class="fc bfc" id="L484" title="All 2 branches covered.">            boolean xVar = x.op() == type;</span>
+<span class="fc" id="L485">            Term v = getXY(x); //xVar ? getXY(x) : x;</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">            if (v == null) v = x;</span>
+
+            //ellipsis to be matched in stage 2
+            //if (x == Xellipsis) {
+            //    continue;
+            //}
+
+<span class="fc bfc" id="L493" title="All 2 branches covered.">            if (v instanceof EllipsisMatch) {</span>
+                //assume it's THE ellipsis here, ie. x == xEllipsis
+<span class="fc" id="L495">                ellipsisMatched = true;</span>
+<span class="fc" id="L496">                Xellipsis = null;</span>
+
+                //check that Y contains all of these
+<span class="fc bfc" id="L499" title="All 2 branches covered.">                if (!((EllipsisMatch) v).addWhileMatching(Y, ineligible))</span>
+<span class="fc" id="L500">                    return false;</span>
+
+                continue;
+<span class="fc bfc" id="L503" title="All 2 branches covered.">            } else if (!xVar) {</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">                if (!Y.containsTerm(v))</span>
+<span class="fc" id="L505">                    return false;</span>
+<span class="fc" id="L506">                ineligible.add(v);</span>
+<span class="fc" id="L507">                continue;</span>
+            }
+
+<span class="fc bfc" id="L510" title="All 2 branches covered.">            if (x != Xellipsis)</span>
+<span class="fc" id="L511">                xSpecific.add(x);</span>
+
+
+        }
+
+<span class="fc" id="L516">        MutableSet&lt;Term&gt; yFree = Y.toSet();</span>
+
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        if (ellipsisMatched) {</span>
+            //Xellipsis = null;
+<span class="fc" id="L520">            return ineligible.equals(yFree);</span>
+        }
+
+<span class="fc" id="L523">        yFree.removeAll(ineligible);</span>
+
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        if (!Xellipsis.valid(yFree.size() - xSpecific.size())) {</span>
+            //wouldnt be enough remaining matches to satisfy ellipsis cardinality
+<span class="fc" id="L527">            return false;</span>
+        }
+
+<span class="fc" id="L530">        return matchCommutiveRemaining(Xellipsis, xSpecific, yFree);</span>
+
+    }
+
+
+    /**
+     * toMatch matched into some or all of Y's terms
+     */
+    private boolean matchCommutiveRemaining(Term xEllipsis, @NotNull Set&lt;Term&gt; x, @NotNull MutableSet&lt;Term&gt; yFree) {
+<span class="fc" id="L539">        int xs = x.size();</span>
+
+<span class="pc bpc" id="L541" title="2 of 4 branches missed.">        switch (xs) {</span>
+            case 0:
+<span class="fc" id="L543">                return putXY(xEllipsis, new EllipsisMatch(yFree));</span>
+            case 1:
+<span class="fc" id="L545">                return addTermutator(new Choose1(this,</span>
+<span class="fc" id="L546">                        xEllipsis, x.iterator().next(), yFree));</span>
+            case 2:
+<span class="nc" id="L548">                return addTermutator(new Choose2(this,</span>
+<span class="nc" id="L549">                        xEllipsis, x.toArray(new Term[x.size()]), yFree));</span>
+            default:
+                //3 or more combination
+<span class="nc" id="L552">                throw new RuntimeException(&quot;unimpl: &quot; + xs + &quot; arity combination unimplemented&quot;);</span>
+        }
+
+    }
+
+//    private boolean matchChoose2(Term[] x, MutableSet&lt;Term&gt; y) {
+//        int prePermute = now();
+//        MutableSet&lt;Term&gt; yCopy = y.clone(); //because matchChoose1 will remove on match
+//
+//        //initial shuffle
+//        if (random.nextBoolean()) {
+//            Term p = x[0];
+//            x[0] = x[1];
+//            x[1] = p;
+//        }
+//
+//        int startDivisor = powerDivisor;
+//        if (!powerDividable(2))
+//            return false;
+//
+//        boolean matched = false;
+//        for (int i = 0; i &lt; 2; i++) {
+//
+//            boolean modified = false;
+//            if (matchChoose1(x[0], y)) {
+//                modified = true;
+//                if (matchChoose1(x[1], y)) {
+//                    matched = true;
+//                    break;
+//                }
+//            }
+//
+//            if (modified) {
+//                y.addAll(yCopy); //restore the original set if any where removed during an incomplete match
+//            }
+//
+//            revert(prePermute);
+//
+//            /* swap */
+//            Term p = x[0];
+//            x[0] = x[1];
+//            x[1] = p;
+//        }
+//
+//        powerDivisor = startDivisor;
+//        return matched;
+//    }
+
+
+    /**
+     * non-commutive compound match
+     * X will contain at least one ellipsis
+     * &lt;p&gt;
+     * match subterms in sequence
+     * &lt;p&gt;
+     * WARNING this implementation only works if there is one ellipse in the subterms
+     * this is not tested for either
+     */
+    public final boolean matchEllipsedLinear(@NotNull Compound X, @NotNull Ellipsis Xellipsis, @NotNull Compound Y) {
+
+<span class="fc" id="L612">        int i = 0, j = 0;</span>
+<span class="fc" id="L613">        int xsize = X.size();</span>
+<span class="fc" id="L614">        int ysize = Y.size();</span>
+
+        //TODO check for shim and subtract xsize?
+
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        while (i &lt; xsize) {</span>
+<span class="fc" id="L619">            Term x = X.term(i++);</span>
+
+<span class="fc bfc" id="L621" title="All 2 branches covered.">            if (x instanceof Ellipsis) {</span>
+<span class="fc" id="L622">                int available = ysize - j;</span>
+
+<span class="fc" id="L624">                Term eMatched = getXY(x); //EllipsisMatch, or null</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">                if (eMatched == null) {</span>
+
+                    //COLLECT
+<span class="fc bfc" id="L628" title="All 2 branches covered.">                    if (i == xsize) {</span>
+                        //SUFFIX
+<span class="fc bfc" id="L630" title="All 2 branches covered.">                        if (!Xellipsis.valid(available))</span>
+<span class="fc" id="L631">                            return false;</span>
+
+                        //TODO special handling to extract intermvals from Sequence terms here
+
+<span class="pc bpc" id="L635" title="1 of 2 branches missed.">                        if (!putXY(Xellipsis,</span>
+                                new EllipsisMatch(
+                                        Y, j, j + available
+                                ))) {
+<span class="nc" id="L639">                            return false;</span>
+                        }
+                    } else {
+                        //PREFIX the ellipsis occurred at the start and there are additional terms following it
+                        //TODO
+<span class="fc" id="L644">                        return false;</span>
+                    }
+                } else {
+                    //previous match exists, match against what it had
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">                    if (i == xsize) {</span>
+//                        //SUFFIX - match the remaining terms against what the ellipsis previously collected
+//                        //HACK this only works with EllipsisMatch type
+//                        Term[] sp = ((EllipsisMatch) eMatched).term;
+//                        if (sp.length!=available)
+//                            return false; //incorrect size
+//
+//                        //match every item
+//                        for (Term aSp : sp) {
+//                            if (!match(aSp, Y.term(j++)))
+//                                return false;
+//                        }
+                    } else {
+                        //TODO other cases
+<span class="nc" id="L662">                        return false;</span>
+                    }
+
+                }
+<span class="fc" id="L666">            } else {</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">                if (!match(x, Y.term(j++)))</span>
+<span class="fc" id="L668">                    return false;</span>
+            }
+<span class="fc" id="L670">        }</span>
+
+<span class="fc" id="L672">        return true;</span>
+    }
+
+
+    /**
+     * elimination
+     */
+    private boolean putVarX(Variable x, @NotNull Term y) {
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">        if (putXY(x, y)) {</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">            if (x instanceof CommonVariable) {</span>
+<span class="nc" id="L682">                putYX(x, y);</span>
+            }
+<span class="fc" id="L684">            return true;</span>
+        }
+<span class="nc" id="L686">        return false;</span>
+    }
+
+
+    private boolean putCommon(@NotNull Variable x, @NotNull Variable y) {
+<span class="fc" id="L691">        Variable commonVar = CommonVariable.make(x, y);</span>
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">        if (putXY(x, commonVar)) {</span>
+<span class="fc" id="L693">            putYX(y, commonVar);</span>
+            //?? what if it fails, should we restore/undo 'x'?
+<span class="fc" id="L695">            return true;</span>
+        }
+<span class="nc" id="L697">        return false;</span>
+    }
+
+    /**
+     * a branch for comparing a particular permutation, called from the main next()
+     */
+    public boolean matchLinear(@NotNull TermContainer X, @NotNull TermContainer Y) {
+<span class="fc" id="L704">        int s = X.size();</span>
+<span class="pc bpc" id="L705" title="1 of 4 branches missed.">        switch (s) {</span>
+            case 0:
+<span class="nc" id="L707">                return true;</span>
+            case 1:
+<span class="fc" id="L709">                return matchSub(X, Y, 0);</span>
+            case 2:
+<span class="fc bfc" id="L711" title="All 2 branches covered.">                if (X.term(1).op(type))</span>
+<span class="fc" id="L712">                    return matchLinearReverse(X, Y);</span>
+        }
+<span class="fc" id="L714">        return matchLinearForward(X, Y);</span>
+    }
+
+
+    public boolean matchLinearForward(@NotNull TermContainer X, @NotNull TermContainer Y) {
+<span class="fc" id="L719">        final int s = X.size();</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">        for (int i = 0; i &lt; s; i++) {</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">            if (!matchSub(X, Y, i)) return false;</span>
+        }
+<span class="fc" id="L723">        return true;</span>
+    }
+
+    public boolean matchSub(@NotNull TermContainer X, @NotNull TermContainer Y, int i) {
+<span class="fc" id="L727">        return match(X.term(i), Y.term(i));</span>
+    }
+
+    public boolean matchLinearReverse(@NotNull TermContainer X, @NotNull TermContainer Y) {
+<span class="fc bfc" id="L731" title="All 2 branches covered.">        for (int i = X.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L732" title="All 2 branches covered.">            if (!matchSub(X, Y, i)) return false;</span>
+        }
+<span class="fc" id="L734">        return true;</span>
+    }
+
+
+    private void matchTermutations(int i, int max) {
+
+<span class="fc bfc" id="L740" title="All 2 branches covered.">        if (i == max) {</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">            if (this.termutes.size() == max)</span>
+<span class="fc" id="L742">                onMatch();</span>
+            else {
+                //throw new RuntimeException(&quot;termutes modified&quot;);
+                //have to restart
+            }
+<span class="fc" id="L747">            return;</span>
+        }
+
+<span class="fc" id="L750">        Termutator t = termutes.get(i);</span>
+<span class="fc" id="L751">        t.reset();</span>
+
+<span class="fc" id="L753">        int revert = now();</span>
+
+<span class="fc bfc" id="L755" title="All 2 branches covered.">        while (t.hasNext()) {</span>
+
+
+            //System.out.println(&quot;@&quot; + now() + &quot; &quot; + i + &quot;: &quot; + t + &quot; &quot;);
+            //System.out.println(&quot;-&gt;  &quot; + xy);
+
+<span class="fc bfc" id="L761" title="All 2 branches covered.">            if (t.next()) {</span>
+                //System.out.println(&quot;@&quot; + now() + &quot; --&gt;  &quot; + xy);
+<span class="fc" id="L763">                matchTermutations(i + 1, max);</span>
+            }
+
+<span class="fc" id="L766">            revert(revert);</span>
+            //System.out.println(&quot;@&quot; + revert + &quot; &lt;-  &quot; + xy);
+
+        }
+
+<span class="fc" id="L771">    }</span>
+
+
+    /**
+     * returns true if the assignment was allowed, false otherwise
+     */
+    public final boolean putXY(Term x /* usually a Variable */, @NotNull Term y) {
+
+//        if (x.equals(y))
+//            throw new RuntimeException(&quot;x==y&quot;);
+
+<span class="fc" id="L782">        VarCachedVersionMap xy = this.xy;</span>
+
+<span class="fc" id="L784">        Versioned&lt;Term&gt; v = xy.map.get(x);</span>
+<span class="fc bfc" id="L785" title="All 2 branches covered.">        Term vv = (v != null) ? v.get() : null;</span>
+<span class="fc bfc" id="L786" title="All 2 branches covered.">        if (vv != null) {</span>
+<span class="fc" id="L787">            return y.equals(vv);</span>
+        }
+<span class="pc bpc" id="L789" title="1 of 2 branches missed.">        if (!assignable(x, y))</span>
+<span class="nc" id="L790">            return false;</span>
+
+<span class="fc bfc" id="L792" title="All 2 branches covered.">        if (v == null) {</span>
+<span class="fc" id="L793">            v = xy.getOrCreateIfAbsent(x);</span>
+        }
+
+<span class="fc" id="L796">        v.set(y);</span>
+<span class="fc" id="L797">        return true;</span>
+    }
+
+    /**
+     * true if the match assignment is allowed by constraints
+     */
+    public boolean assignable(Term x, Term y) {
+<span class="pc bpc" id="L804" title="1 of 2 branches missed.">        if (constraints == null) return true;</span>
+<span class="nc" id="L805">        MatchConstraint c = constraints.get(x);</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">        if (c == null) return true;</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">        return !c.invalid(x, y, this);</span>
+    }
+
+    public final void putYX(Term y /* usually a Variable */, Term x) {
+<span class="fc" id="L811">        yx.put(x, y);</span>
+<span class="fc" id="L812">    }</span>
+
+    @Nullable
+    public Term apply(Term t) {
+<span class="nc" id="L816">        throw new RuntimeException(&quot;unimpl&quot;);</span>
+    }
+
+
+    /**
+     * default compound matching; op will already have been compared. no ellipsis will be involved
+     */
+    public final boolean matchCompound(@NotNull Compound x, @NotNull Compound y) {
+<span class="fc" id="L824">        int xs = x.size();</span>
+<span class="fc bfc" id="L825" title="All 4 branches covered.">        if ((xs == y.size()) &amp;&amp; (x.relation() == y.relation())) {</span>
+<span class="fc bfc" id="L826" title="All 4 branches covered.">            return ((xs &gt; 1) &amp;&amp; (x.isCommutative())) ?</span>
+<span class="fc" id="L827">                    matchPermute(x, y) :</span>
+<span class="fc" id="L828">                    matchLinear(x.subterms(), y.subterms());</span>
+        }
+<span class="fc" id="L830">        return false;</span>
+    }
+}
+
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

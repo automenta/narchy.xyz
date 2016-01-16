@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Variable.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.variable</a> &gt; <span class="el_source">Variable.java</span></div><h1>Variable.java</h1><pre class="source lang-java linenums">/*
+ * Variable.java
+ *
+ * Copyright (C) 2008  Pei Wang
+ *
+ * This file is part of Open-NARS.
+ *
+ * Open-NARS is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Open-NARS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Open-NARS.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package nars.term.variable;
+
+
+import nars.$;
+import nars.Op;
+import nars.term.Termlike;
+import nars.term.atom.AbstractStringAtom;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * A variable term, which does not correspond to a concept
+ */
+public abstract class Variable extends AbstractStringAtom {
+
+    protected Variable(String n) {
+<span class="fc" id="L36">        super(n);</span>
+<span class="fc" id="L37">    }</span>
+
+    protected Variable(@NotNull byte[] n) {
+<span class="nc" id="L40">        super(n);</span>
+<span class="nc" id="L41">    }</span>
+
+    protected Variable(String n, Op specificOp) {
+<span class="fc" id="L44">        super(n, specificOp);</span>
+<span class="fc" id="L45">    }</span>
+
+    public static Variable v(@NotNull Op varType, String baseName) {
+<span class="fc" id="L48">        return v(varType.ch, baseName);</span>
+    }
+
+    public static Variable v(char ch, String name) {
+<span class="fc" id="L52">        return $.v(ch, name);</span>
+    }
+
+
+    public static final int MAX_VARIABLE_CACHED_PER_TYPE = 16;
+
+    /**
+     * numerically-indexed variable instance cache; prevents duplicates and speeds comparisons
+     */
+<span class="fc" id="L61">    public static final Variable[][] varCache = new Variable[4][MAX_VARIABLE_CACHED_PER_TYPE];</span>
+
+//    public static Op typeIndex(char c) {
+//        switch (c) {
+//            case '%':
+//                return Op.VAR_PATTERN;
+//            case '#':
+//                return Op.VAR_DEP;
+//            case '$':
+//                return Op.VAR_INDEP;
+//            case '?':
+//                return Op.VAR_QUERY;
+//        }
+//        throw new RuntimeException(c + &quot; not a variable&quot;);
+//    }
+
+    //    //TODO replace this with a generic counting method of how many subterms there are present
+//    public static int numPatternVariables(Term t) {
+//        t.value(new TermToInt()) //..
+////        final int[] has = {0};
+////        t.recurseTerms((t1, superterm) -&gt; {
+////            if (t1.op() == Op.VAR_PATTERN)
+////                has[0]++;
+////        });
+////        return has[0];
+//    }
+
+
+    /**
+     * true if it has or is a pattern variable
+     * necessary because VAR_PATTERN are hidden from substructure
+     */
+    public static boolean hasPatternVariable(@NotNull Termlike t) {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        return t.or(x -&gt; x.op() == Op.VAR_PATTERN);</span>
+    }
+
+
+    /**
+     * The syntactic complexity of a variable is 0, because it does not refer to
+     * any concept.
+     *
+     * @return The complexity of the term, an integer
+     */
+    @Override
+    public final int complexity() {
+<span class="fc" id="L106">        return 0;</span>
+    }
+
+    /** produce a normalized version of this identified by the serial integer */
+    @NotNull
+    public abstract Variable normalize(int serial);
+
+
+    public static final class VarDep extends Variable {
+
+        public VarDep(String name) {
+<span class="fc" id="L117">            super(Op.VAR_DEP.ch + name);</span>
+<span class="fc" id="L118">        }</span>
+
+        @Override
+        public Variable normalize(int serial) {
+<span class="fc" id="L122">            return $.v(Op.VAR_DEP, serial);</span>
+        }
+
+        @NotNull
+        @Override
+        public Op op() {
+<span class="fc" id="L128">            return Op.VAR_DEP;</span>
+        }
+
+        @Override
+        public int vars() {
+<span class="fc" id="L133">            return 1;</span>
+        }
+
+        @Override
+        public int varDep() {
+<span class="fc" id="L138">            return 1;</span>
+        }
+
+        @Override
+        public int varIndep() {
+<span class="fc" id="L143">            return 0;</span>
+        }
+
+        @Override
+        public int varQuery() {
+<span class="fc" id="L148">            return 0;</span>
+        }
+    }
+
+    public static final class VarIndep extends Variable {
+
+
+        public VarIndep(String name) {
+<span class="fc" id="L156">            super(Op.VAR_INDEP.ch + name);</span>
+<span class="fc" id="L157">        }</span>
+
+        @Override
+        public Variable normalize(int serial) {
+<span class="fc" id="L161">            return $.v(Op.VAR_INDEP, serial);</span>
+        }
+
+        @NotNull
+        @Override
+        public Op op() {
+<span class="fc" id="L167">            return Op.VAR_INDEP;</span>
+        }
+
+        @Override
+        public int vars() {
+<span class="fc" id="L172">            return 1;</span>
+        }
+
+        @Override
+        public int varDep() {
+<span class="fc" id="L177">            return 0;</span>
+        }
+
+        @Override
+        public int varIndep() {
+<span class="fc" id="L182">            return 1;</span>
+        }
+
+        @Override
+        public int varQuery() {
+<span class="fc" id="L187">            return 0;</span>
+        }
+
+    }
+
+    public static final class VarQuery extends Variable {
+
+
+        public VarQuery(String name) {
+<span class="fc" id="L196">            super(Op.VAR_QUERY.ch + name);</span>
+<span class="fc" id="L197">        }</span>
+
+        @Override
+        public Variable normalize(int serial) {
+<span class="fc" id="L201">            return $.v(Op.VAR_QUERY, serial);</span>
+        }
+
+        @NotNull
+        @Override
+        public Op op() {
+<span class="fc" id="L207">            return Op.VAR_QUERY;</span>
+        }
+
+        @Override
+        public int vars() {
+<span class="fc" id="L212">            return 1;</span>
+        }
+
+        @Override
+        public int varDep() {
+<span class="fc" id="L217">            return 0;</span>
+        }
+
+        @Override
+        public int varIndep() {
+<span class="fc" id="L222">            return 0;</span>
+        }
+
+        @Override
+        public int varQuery() {
+<span class="fc" id="L227">            return 1;</span>
+        }
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

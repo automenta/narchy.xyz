@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>EllipsisZeroOrMore.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.match</a> &gt; <span class="el_source">EllipsisZeroOrMore.java</span></div><h1>EllipsisZeroOrMore.java</h1><pre class="source lang-java linenums">package nars.term.match;
+
+import nars.$;
+import nars.Op;
+import nars.term.transform.VariableNormalization;
+import nars.term.variable.Variable;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * Created by me on 12/5/15.
+ */
+public class EllipsisZeroOrMore extends Ellipsis {
+    public EllipsisZeroOrMore(@NotNull Variable name) {
+<span class="fc" id="L14">        super(name, &quot;..*&quot;);</span>
+<span class="fc" id="L15">    }</span>
+
+    @NotNull
+    @Override
+    public Variable normalize(int serial) {
+<span class="nc" id="L20">        return new EllipsisZeroOrMore($.v(Op.VAR_PATTERN, serial));</span>
+    }
+
+    @Override
+    public boolean valid(int collectable) {
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        return collectable &gt;= 0;</span>
+    }
+
+    @NotNull
+    @Override
+    public Variable clone(@NotNull Variable newVar, VariableNormalization normalizer) {
+<span class="fc" id="L31">        return new EllipsisZeroOrMore(newVar);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

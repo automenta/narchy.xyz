@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>DefaultTruth.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.truth</a> &gt; <span class="el_source">DefaultTruth.java</span></div><h1>DefaultTruth.java</h1><pre class="source lang-java linenums">package nars.truth;
+
+import nars.Memory;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * Created by me on 5/19/15.
+ */
+public class DefaultTruth extends AbstractScalarTruth {
+
+
+
+    /** unspecified confidence, will be invalid unless updated later */
+<span class="fc" id="L14">    public DefaultTruth(float f) {</span>
+<span class="fc" id="L15">        setFrequency(f);</span>
+<span class="fc" id="L16">        confidence = Float.NaN;</span>
+<span class="fc" id="L17">    }</span>
+
+<span class="fc" id="L19">    public DefaultTruth(float f, float c) {</span>
+
+<span class="fc" id="L21">        set(f,c);</span>
+
+<span class="fc" id="L23">    }</span>
+
+//    public DefaultTruth(Truth v) {
+//        super(v);
+//    }
+
+<span class="nc" id="L29">    public DefaultTruth(char punctuation, @NotNull Memory m) {</span>
+<span class="nc" id="L30">        set(1.0f, m.getDefaultConfidence(punctuation));</span>
+<span class="nc" id="L31">    }</span>
+
+    /** 0, 0 default */
+<span class="nc" id="L34">    public DefaultTruth() {</span>
+<span class="nc" id="L35">    }</span>
+
+    public DefaultTruth(@NotNull AbstractScalarTruth toClone) {
+<span class="nc" id="L38">        this(toClone.getFrequency(), toClone.getConfidence());</span>
+<span class="nc" id="L39">    }</span>
+
+    public DefaultTruth(@NotNull Truth truth) {
+<span class="fc" id="L42">        this(truth.getFrequency(), truth.getConfidence());</span>
+<span class="fc" id="L43">    }</span>
+
+    @NotNull
+    @Override
+    public Truth mulConf(float factor) {
+<span class="nc" id="L48">        return new DefaultTruth(getFrequency(), getConfidence() * factor);</span>
+    }
+
+    /*    public float getEpsilon() {
+        return DEFAULT_TRUTH_EPSILON;
+    }*/
+
+//    /** truth with 0.01 resolution */
+//    public static class DefaultTruth01 extends DefaultTruth {
+//
+//        public DefaultTruth01(float f, float c) {
+//            super(f, c);
+//        }
+//    }
+//
+//
+//
+//    /** truth with 0.1 resolution */
+//    public static class DefaultTruth1 extends AbstractDefaultTruth {
+//
+//        @Override
+//        public float getEpsilon() {
+//            return 0.1f;
+//        }
+//    }
+//
+//
+//    /** truth with 0.001 resolution */
+//    public static class DefaultTruth001 extends AbstractDefaultTruth {
+//
+//        @Override
+//        public float getEpsilon() {
+//            return 0.001f;
+//        }
+//    }
+//
+//
+//    /** truth with 0.05 resolution */
+//    public static class DefaultTruth05 extends AbstractDefaultTruth {
+//
+//        @Override
+//        public float getEpsilon() {
+//            return 0.05f;
+//        }
+//    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

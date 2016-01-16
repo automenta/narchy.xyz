@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>DefaultBeliefTable.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.concept.util</a> &gt; <span class="el_source">DefaultBeliefTable.java</span></div><h1>DefaultBeliefTable.java</h1><pre class="source lang-java linenums">package nars.concept.util;
+
+import com.google.common.collect.Iterators;
+import com.gs.collections.api.block.function.primitive.FloatFunction;
+import nars.Global;
+import nars.Memory;
+import nars.bag.impl.ArrayTable;
+import nars.nal.LocalRules;
+import nars.nal.Tense;
+import nars.task.Task;
+import nars.truth.Truthed;
+import nars.util.ArraySortedIndex;
+import nars.util.data.Util;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+
+/**
+ * Stores beliefs ranked in a sorted ArrayList, with strongest beliefs at lowest indexes (first iterated)
+ */
+public class DefaultBeliefTable implements BeliefTable {
+
+    @NotNull
+    final Map&lt;Task,Task&gt; map;
+    @NotNull
+    final ArrayTable&lt;Task,Task&gt; eternal;
+    @NotNull
+    final ArrayTable&lt;Task,Task&gt; temporal;
+
+    private long now; //cached value, updated before temporal operations begin
+    private long minT, maxT, tRange;
+
+    public DefaultBeliefTable(int cap, @NotNull Memory memory) {
+<span class="fc" id="L39">        super();</span>
+
+<span class="fc" id="L41">        this.map = new HashMap(cap/2);</span>
+<span class="fc" id="L42">        this.now = memory.time();</span>
+<span class="fc" id="L43">        this.minT = this.maxT = Tense.TIMELESS;</span>
+<span class="fc" id="L44">        this.tRange = 1;</span>
+
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (cap == 1) cap = 2;</span>
+<span class="fc" id="L47">        eternal = new SetTable&lt;Task&gt;(cap/2, map,</span>
+                Truthed::getConfidence
+        );
+<span class="fc" id="L50">        temporal = new SetTable&lt;Task&gt;(cap/2, map,</span>
+<span class="fc" id="L51">            b -&gt; rankTemporal(b, now)</span>
+        );
+<span class="fc" id="L53">    }</span>
+
+    void updateTime(long now, boolean updateRange) {
+<span class="fc" id="L56">        this.now = now;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (updateRange) {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (temporal.isEmpty()) {</span>
+<span class="nc" id="L59">                tRange = 1;</span>
+<span class="nc" id="L60">                minT = maxT = Tense.TIMELESS;</span>
+            }
+<span class="fc" id="L62">            minT = Long.MAX_VALUE;</span>
+<span class="fc" id="L63">            maxT = Long.MIN_VALUE;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (Task x : temporal) {</span>
+<span class="fc" id="L65">                long o = x.getOccurrenceTime();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                if (o &gt; maxT) maxT = o;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                if (o &lt; minT) minT = o;</span>
+<span class="fc" id="L68">            }</span>
+<span class="fc" id="L69">            tRange = Math.max(1, maxT - minT);</span>
+
+        }
+<span class="fc" id="L72">    }</span>
+
+
+    public float rankTemporal(@NotNull Task b, long when) {
+<span class="fc" id="L76">        return b.getConfidence()/((1f+Math.abs(b.getOccurrenceTime() - when))/tRange);</span>
+    }
+
+    @NotNull
+    @Override
+    public Iterator&lt;Task&gt; iterator() {
+<span class="fc" id="L82">        return Iterators.concat(eternal.items.iterator(), temporal.items.iterator());</span>
+    }
+
+    @Override
+    public void forEach(@NotNull Consumer&lt;? super Task&gt; action) {
+<span class="fc" id="L87">        eternal.forEach(action);</span>
+<span class="fc" id="L88">        temporal.forEach(action);</span>
+<span class="fc" id="L89">    }</span>
+
+    @Override
+    public void setCapacity(int newCapacity) {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (newCapacity == 1) newCapacity = 2; //prevent 0 by accident</span>
+<span class="nc" id="L94">        eternal.setCapacity(newCapacity/2);</span>
+<span class="nc" id="L95">        temporal.setCapacity(newCapacity/2);</span>
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public int size() {
+<span class="fc" id="L100">        return eternal.size() + temporal.size();</span>
+    }
+
+    @Override public boolean isEmpty() {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        return size()==0;</span>
+    }
+
+    @Override
+    public int getCapacity() {
+<span class="fc" id="L109">        return eternal.capacity() + temporal.capacity();</span>
+    }
+
+    //    @Override
+//    public Task top(boolean hasQueryVar, long now, long occTime, Truth truth) {
+//        throw new RuntimeException(&quot;not supposed to be called&quot;);
+//    }
+
+
+    @Override
+    public void clear() {
+<span class="nc" id="L120">        eternal.clear();</span>
+<span class="nc" id="L121">        temporal.clear();</span>
+<span class="nc" id="L122">    }</span>
+
+    @Nullable
+    @Override
+    public Task topEternal() {
+<span class="fc" id="L127">        return eternal.highest();</span>
+    }
+
+    @Nullable
+    @Override
+    public Task topTemporal(long when) {
+<span class="fc" id="L133">        Task best = null;</span>
+<span class="fc" id="L134">        float bestRank = -1;</span>
+<span class="fc" id="L135">        List&lt;? extends Task&gt; l = temporal.items.getList();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (int i = 0; i &lt; l.size(); i++) {</span>
+<span class="fc" id="L137">            Task x = l.get(i);</span>
+<span class="fc" id="L138">            float r = rankTemporal(x, when);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if ((r &gt; bestRank) ||</span>
+                    //tie-breaker: closer to the target time
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                    ((Util.equal(r, bestRank, Global.BUDGET_PROPAGATION_EPSILON)) &amp;&amp;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                        (Math.abs(when - best.getOccurrenceTime()) &lt; Math.abs(when - x.getOccurrenceTime())))) {</span>
+<span class="fc" id="L143">                best = x;</span>
+<span class="fc" id="L144">                bestRank = r;</span>
+            }
+        }
+<span class="fc" id="L147">        return best;</span>
+    }
+
+
+//    @Deprecated @Override
+//    public final Task top(Ranker r) {
+//
+//        Task[] tasks = getCachedNullTerminatedArray();
+//        //if (tasks == null) return null;
+//
+//
+//        float s = Float.NEGATIVE_INFINITY;
+//        Task b = null;
+//
+//        for (int i = tasks.length - 1; i &gt;= 0; i--) {
+//            Task t = tasks[i];
+//            if (t != null) {
+//                float x = r.rank(t, s);
+//                if (x + DefaultTruth.DEFAULT_TRUTH_EPSILON &gt; s) {
+//                    s = x;
+//                    b = t;
+//                }
+//            }
+//        }
+//
+////        Task t;
+////        for (int i = 0; null != (t = tasks[i++]); ) {
+////            float x = r.rank(t, s);
+////            if (x &gt; s) {
+////                s = x;
+////                b = t;
+////            }
+////        }
+//
+//        return b;
+//    }
+
+
+    /**
+     * merges an input task with this belief table.
+     * ordinarily this should never return null.
+     * it will return the best matching old or new (input or
+     * revised here) belief corresponding to the input.
+     * &lt;p&gt;
+     * the input will either be added or not depending
+     * on its relation to the table's contents.
+     *
+     * if the new task is rejected, it will be deleted. callee must check
+     * for this condition
+     */
+    @Nullable
+    @Override
+    public Task add(@NotNull Task input, @NotNull Memory memory, @NotNull Consumer&lt;Task&gt; onBeliefChanged) {
+
+<span class="fc" id="L201">        long now = this.now = memory.time();</span>
+
+<span class="fc" id="L203">        boolean eternal = input.isEternal();</span>
+
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        Task preTop = eternal ? topEternal() : top(now);</span>
+<span class="fc" id="L206">        boolean tableChanged = insert(input, memory);</span>
+
+        Task result;
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (!tableChanged) {</span>
+<span class="nc" id="L210">            result = preTop;</span>
+        } else {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            result = (preTop != null) ?</span>
+<span class="fc" id="L213">                    addRevise(input, preTop, memory, now) :</span>
+<span class="fc" id="L214">                    input;</span>
+
+<span class="fc" id="L216">            onBeliefChanged.accept(result);</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            updateTime(now, !eternal);</span>
+        }
+
+<span class="fc" id="L220">        return result;</span>
+    }
+
+    @Nullable
+    Task addRevise(@NotNull Task input, @NotNull Task preTop, @NotNull Memory memory, long now) {
+        //TODO make sure input.isDeleted() can not happen
+
+<span class="fc" id="L227">        Task revised = LocalRules.getRevision(input, preTop, now);</span>
+
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">        if (revised != null &amp;&amp; !revised.equals(input)) {</span>
+            //return the revised task even if it wasn't inserted allowing it to be used as a transient
+<span class="fc" id="L231">            boolean inserted = insertAttempt(revised, memory);</span>
+            //if (inserted) {
+<span class="fc" id="L233">            memory.eventRevision.emit(revised);</span>
+<span class="fc" id="L234">            return revised;</span>
+        }
+
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        return input.isEternal() ? topEternal() : top(now);</span>
+    }
+
+    private boolean insert(@NotNull Task t, @NotNull Memory memory) {
+<span class="fc" id="L241">        ArrayTable&lt;Task, Task&gt; table = getTableFor(t);</span>
+
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (Global.DEBUG) {</span>
+<span class="fc" id="L244">            checkForDeleted(t, table);</span>
+        }
+
+<span class="fc" id="L247">        Task displaced = table.put(t,t);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (displaced!=null)</span>
+<span class="fc" id="L249">            onBeliefRemoved(displaced, &quot;Unbelievable/Undesirable&quot;, memory);</span>
+
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        return t == displaced ? false : true;</span>
+    }
+
+    /** try to insert but dont delete the input task if it wasn't inserted (but delete a displaced if it was)
+     *  returns true if it was inserted, false if not
+     * */
+    private boolean insertAttempt(@NotNull Task t, @NotNull Memory memory) {
+<span class="fc" id="L258">        ArrayTable&lt;Task, Task&gt; table = getTableFor(t);</span>
+<span class="fc" id="L259">        Task displaced = table.put(t,t);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        boolean inserted = displaced != t;</span>
+<span class="pc bpc" id="L261" title="1 of 4 branches missed.">        if (displaced!=null &amp;&amp; inserted)</span>
+<span class="fc" id="L262">            onBeliefRemoved(displaced, &quot;Unbelievable/Undesirable (Revision Displaced)&quot;, memory);</span>
+
+<span class="fc" id="L264">        return inserted;</span>
+    }
+
+    @NotNull
+    private ArrayTable&lt;Task, Task&gt; getTableFor(@NotNull Task t) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        return t.isEternal() ? this.eternal : this.temporal;</span>
+    }
+
+
+
+
+    private static void onBeliefRemoved(@NotNull Task t, String reason, @NotNull Memory memory) {
+<span class="fc" id="L276">        memory.remove(t, reason);</span>
+<span class="fc" id="L277">    }</span>
+
+    static void checkForDeleted(@NotNull Task input, @NotNull ArrayTable&lt;Task,Task&gt; table) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (input.getDeleted())</span>
+<span class="nc" id="L281">            throw new RuntimeException(&quot;deleted task being added&quot;);</span>
+
+<span class="fc" id="L283">        table.forEach((Task dt) -&gt; {</span>
+//            if (dt == null)
+//                throw new RuntimeException(&quot;wtf&quot;);
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">            if (dt.getDeleted()) {</span>
+<span class="nc" id="L287">                throw new RuntimeException(</span>
+                        //System.err.println(
+                        &quot;deleted tasks should not be present in belief tables: &quot; + dt);
+                //System.err.println(dt.getExplanation());
+                //remove(i);
+                //i--;
+//
+            }
+<span class="fc" id="L295">        });</span>
+<span class="fc" id="L296">    }</span>
+
+    final static class SetTable&lt;T&gt; extends ArrayTable&lt;T,T&gt; {
+        public SetTable(int cap, Map&lt;T,T&gt; index, FloatFunction&lt;T&gt; score) {
+<span class="fc" id="L300">            super(new LambdaSortedIndex(cap, score), index);</span>
+<span class="fc" id="L301">        }</span>
+
+        @Override
+        public T key(T t) {
+<span class="fc" id="L305">            return t;</span>
+        }
+
+    }
+
+    final static class LambdaSortedIndex&lt;T&gt; extends ArraySortedIndex&lt;T&gt; {
+        private final FloatFunction&lt;T&gt; score;
+
+        public LambdaSortedIndex(int cap, FloatFunction&lt;T&gt; score) {
+<span class="fc" id="L314">            super(cap);</span>
+<span class="fc" id="L315">            this.score = score;</span>
+<span class="fc" id="L316">        }</span>
+
+        @Override public float score(T b) {
+<span class="fc" id="L319">            return score.floatValueOf(b);</span>
+        }
+    }
+
+
+//    @Override
+//    public final boolean tryAdd(Task input, Ranker r, Memory memory) {
+//
+//        if (Global.DEBUG) {
+//            if (input.getDeleted())
+//                throw new RuntimeException(&quot;deleted task being added&quot;);
+//            checkForDeleted();
+//        }
+//
+//        float rankInput = r.rank(input);    // for the new isBelief
+//
+//        int siz = data.size();
+//        boolean atCapacity = (capacity == siz);
+//        Task[] tasks = getCachedNullTerminatedArray();
+//
+//        int i = 0;
+//
+//        for (Task b; null != (b = tasks[i++]); ) {
+//
+//            if (b.equals(input)) {
+//                //these should be preventable earlier
+//                if (b!=input) {
+//                    onBeliefRemoved(input, &quot;Duplicate&quot;, memory);
+//                    if (Global.DEBUG) {
+//                        checkForDeleted();
+//                    }
+//                }
+//                return false;
+//            }
+//
+//            float existingRank = r.rank(b, rankInput);
+//
+//            boolean inputGreater = !Float.isFinite(existingRank) || (rankInput &gt; existingRank);
+//            if (inputGreater) {
+//                break; //item will be inserted at this index
+//            }
+//        }
+//
+//        i--; //-1 is correct since after the above for loop it will be 1 ahead
+//
+//
+//        if (atCapacity) {
+//            if (i == siz) {
+//                //reached the end of the list and there is no room to add at the end
+//                //here we cant remove it yet because it is needed for revision
+//                return false;
+//            } else {
+//                Task removed = remove(siz - 1);
+//                onBeliefRemoved(removed, &quot;Forgotten&quot;, memory);
+//            }
+//        }
+//
+//        add(i, input);
+//        return true;
+//    }
+
+//TODO provide a projected belief
+//
+//
+//
+//        //first create a projected
+//
+//
+//        /*if (t.sentence == belief.sentence) {
+//            return false;
+//        }*/
+//
+//        if (belief.sentence.equalStamp(t.sentence, true, false, true)) {
+////                if (task.getParentTask() != null &amp;&amp; task.getParentTask().sentence.isJudgment()) {
+////                    //task.budget.decPriority(0);    // duplicated task
+////                }   // else: activated belief
+//
+//            getMemory().removed(belief, &quot;Duplicated&quot;);
+//            return false;
+//        } else if (revisible(belief.sentence, t.sentence)) {
+//            //final long now = getMemory().time();
+//
+////                if (nal.setTheNewStamp( //temporarily removed
+////                /*
+////                if (equalBases(first.getBase(), second.getBase())) {
+////                return null;  // do not merge identical bases
+////                }
+////                 */
+////                //        if (first.baseLength() &gt; second.baseLength()) {
+////                new Stamp(newStamp, oldStamp, memory.time()) // keep the order for projection
+////                //        } else {
+////                //            return new Stamp(second, first, time);
+////                //        }
+////                ) != null) {
+//
+//            //TaskSeed projectedBelief = t.projection(nal.memory, now, task.getOccurrenceTime());
+//
+//
+//            //Task r = t.projection(nal.memory, now, newBelief.getOccurrenceTime());
+//
+//            //Truth r = t.projection(now, newBelief.getOccurrenceTime());
+//                /*
+//                if (projectedBelief.getOccurrenceTime()!=t.getOccurrenceTime()) {
+//                }
+//                */
+//
+//
+//
+//            Task revised = tryRevision(belief, t, false, nal);
+//            if (revised != null) {
+//                belief = revised;
+//                nal.setCurrentBelief(revised);
+//            }
+//
+//        }
+//
+
+//        if (!addToTable(belief, getBeliefs(), getMemory().param.conceptBeliefsMax.get(), Events.ConceptBeliefAdd.class, Events.ConceptBeliefRemove.class)) {
+//            //wasnt added to table
+//            getMemory().removed(belief, &quot;Insufficient Rank&quot;); //irrelevant
+//            return false;
+//        }
+//    }
+
+//    @Override
+//    public Task addGoal(Task goal, Concept c) {
+//        if (goal.equalStamp(t, true, true, false)) {
+//            return false; // duplicate
+//        }
+//
+//        if (revisible(goal.sentence, oldGoal)) {
+//
+//            //nal.setTheNewStamp(newStamp, oldStamp, memory.time());
+//
+//
+//            //Truth projectedTruth = oldGoal.projection(now, task.getOccurrenceTime());
+//                /*if (projectedGoal!=null)*/
+//            {
+//                // if (goal.after(oldGoal, nal.memory.param.duration.get())) { //no need to project the old goal, it will be projected if selected anyway now
+//                // nal.singlePremiseTask(projectedGoal, task.budget);
+//                //return;
+//                // }
+//                //nal.setCurrentBelief(projectedGoal);
+//
+//                Task revisedTask = tryRevision(goal, oldGoalT, false, nal);
+//                if (revisedTask != null) { // it is revised, so there is a new task for which this function will be called
+//                    goal = revisedTask;
+//                    //return true; // with higher/lower desire
+//                } //it is not allowed to go on directly due to decision making https://groups.google.com/forum/#!topic/open-nars/lQD0no2ovx4
+//
+//                //nal.setCurrentBelief(revisedTask);
+//            }
+//        }
+//    }
+
+
+    //    public static float rankBeliefConfidence(final Sentence judg) {
+//        return judg.getTruth().getConfidence();
+//    }
+//
+//    public static float rankBeliefOriginal(final Sentence judg) {
+//        final float confidence = judg.truth.getConfidence();
+//        final float originality = judg.getOriginality();
+//        return or(confidence, originality);
+//    }
+
+
+//    boolean addToTable(final Task goalOrJudgment, final List&lt;Task&gt; table, final int max, final Class eventAdd, final Class eventRemove, Concept c) {
+//        int preSize = table.size();
+//
+//        final Memory m = c.getMemory();
+//
+//        Task removed = addToTable(goalOrJudgment, table, max, c);
+//
+//        if (size()!=preSize)
+//            c.onTableUpdated(goalOrJudgment.getPunctuation(), preSize);
+//
+//        if (removed != null) {
+//            if (removed == goalOrJudgment) return false;
+//
+//            m.emit(eventRemove, this, removed.sentence, goalOrJudgment.sentence);
+//
+//            if (preSize != table.size()) {
+//                m.emit(eventAdd, this, goalOrJudgment.sentence);
+//            }
+//        }
+//
+//        return true;
+//    }
+
+
+//    /**
+//     * Select a belief to interact with the given task in logic
+//     * &lt;p/&gt;
+//     * get the first qualified one
+//     * &lt;p/&gt;
+//     * only called in RuleTables.rule
+//     *
+//     * @return The selected isBelief
+//     */
+////    @Override
+//    public Task match(final Task task, long now) {
+//        if (isEmpty()) return null;
+//
+//        long occurrenceTime = task.getOccurrenceTime();
+//
+//        final int b = size();
+//
+//        if (task.isEternal()) {
+//            Task eternal = top(true, false);
+//
+//        }
+//        else {
+//
+//        }
+//
+//        for (final Task belief : this) {
+//
+//            //if (task.sentence.isEternal() &amp;&amp; belief.isEternal()) return belief;
+//
+//
+//            return belief;
+//        }
+//
+//
+//        Task projectedBelief = belief.projectTask(occurrenceTime, now);
+//
+//        //TODO detect this condition before constructing Task
+//        if (projectedBelief.getOccurrenceTime()!=belief.getOccurrenceTime()) {
+//            //belief = nal.derive(projectedBelief); // return the first satisfying belief
+//            return projectedBelief;
+//        }
+//
+//        return null;
+//    }
+
+//    @Override
+//    public Task project(Task t, long now) {
+//        Task closest = topRanked();
+//        if (closest == null) return null;
+//        return closest.projectTask(t.getOccurrenceTime(), now);
+//    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

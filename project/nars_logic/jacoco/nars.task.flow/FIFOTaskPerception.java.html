@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>FIFOTaskPerception.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.task.flow</a> &gt; <span class="el_source">FIFOTaskPerception.java</span></div><h1>FIFOTaskPerception.java</h1><pre class="source lang-java linenums">package nars.task.flow;
+
+import nars.NAR;
+import nars.task.Task;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+/**
+ * accumulates a buffer of iasks which can be delivered at a specific rate.
+ * &lt;p&gt;
+ * consists of 2 buffers which are sampled in some policy each cycle
+ * &lt;p&gt;
+ * &quot;input&quot; - a dequeue in which input tasks are appended
+ * in the order they are received
+ * &lt;p&gt;
+ * &quot;newTasks&quot; - a priority buffer, emptied in batches,
+ * in which derived tasks and other feedback accumulate
+ * &lt;p&gt;
+ * Sub-interfaces
+ * &lt;p&gt;
+ * Storage
+ * &lt;p&gt;
+ * Delivery (procedure for cyclical input policy
+ */
+public class FIFOTaskPerception extends TaskPerception {
+
+    /**
+     * max # of inputs to perceive per cycle; -1 means unlimited (attempts to drains input to empty each cycle)
+     */
+<span class="pc" id="L35">    public final AtomicInteger inputsPerCycleMax = new AtomicInteger(1);</span>
+
+    /* ?? public interface Storage { void put(Task t); }*/
+
+    //public final ItemAccumulator&lt;Task&gt; newTasks;
+
+<span class="pc" id="L41">    public final Deque&lt;Task&gt; buffer = new ArrayDeque();</span>
+
+    /**
+     * determines if content can enter
+     */
+    protected final Predicate&lt;Task&gt; filter;
+
+    public FIFOTaskPerception(@NotNull NAR nar, Predicate&lt;Task&gt; filter, Consumer&lt;Task&gt; receiver) {
+<span class="fc" id="L49">        super(nar.memory, receiver);</span>
+<span class="fc" id="L50">        this.filter = filter;</span>
+<span class="fc" id="L51">    }</span>
+
+    public FIFOTaskPerception(@NotNull NAR nar, Predicate&lt;Task&gt; filter) {
+<span class="nc" id="L54">        super(nar.memory);</span>
+<span class="nc" id="L55">        this.filter = filter;</span>
+<span class="nc" id="L56">    }</span>
+    public FIFOTaskPerception(@NotNull NAR nar) {
+<span class="nc" id="L58">        this(nar, null);</span>
+<span class="nc" id="L59">    }</span>
+
+    @Override
+    public void forEach(@NotNull Consumer&lt;? super Task&gt; each) {
+<span class="nc" id="L63">        buffer.forEach(each);</span>
+<span class="nc" id="L64">    }</span>
+
+    @Override
+    public void accept(@NotNull Task t) {
+<span class="fc" id="L68">        Predicate&lt;Task&gt; f = this.filter;</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (f == null || f.test(t)) {</span>
+
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (t.getDeleted())</span>
+<span class="nc" id="L72">                throw new RuntimeException(&quot;task deleted&quot;);</span>
+
+<span class="nc" id="L74">            buffer.add(t);</span>
+        }
+<span class="fc" id="L76">    }</span>
+
+    @Override
+    public void clear() {
+<span class="nc" id="L80">        buffer.clear();</span>
+<span class="nc" id="L81">    }</span>
+
+
+
+    //        @Override
+//        public void accept(Task t) {
+//            if (t.isInput())
+//                percepts.add(t);
+//            else {
+////                if (t.getParentTask() != null &amp;&amp; t.getParentTask().getTerm().equals(t.getTerm())) {
+////                } else {
+//                    newTasks.add(t);
+//                }
+//            }
+//        }
+
+    /** sends the next batch of tasks to the receiver */
+    @Override
+    public void nextFrame(@NotNull Consumer&lt;Task&gt; receiver) {
+
+
+<span class="fc" id="L102">        int s = buffer.size();</span>
+<span class="fc" id="L103">        int n = Math.min(s, inputsPerCycleMax.get()); //counts down successful sends</span>
+<span class="fc" id="L104">        int r = n; //actual cycles counted</span>
+
+
+        //n will be equal to or greater than r
+<span class="pc bpc" id="L108" title="3 of 4 branches missed.">        for (; n &gt; 0 &amp;&amp; r &gt; 0; r--) {</span>
+<span class="nc" id="L109">            Task t = buffer.removeFirst();</span>
+
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (t.getDeleted()) {</span>
+                //the task became deleted while this was in the buffer. no need to repeat Memory.removed
+<span class="nc" id="L113">                continue;</span>
+            }
+
+<span class="nc" id="L116">            receiver.accept(t);</span>
+<span class="nc" id="L117">            n--;</span>
+        }
+
+<span class="fc" id="L120">    }</span>
+
+//        protected void runNewTasks() {
+//            runNewTasks(newTasks.size()); //all
+//        }
+//
+//        protected void runNewTasks(int max) {
+//
+//            int numNewTasks = Math.min(max, newTasks.size());
+//            if (numNewTasks == 0) return;
+//
+//            //queueNewTasks();
+//
+//            for (int n = newTasks.size() - 1; n &gt;= 0; n--) {
+//                Task highest = newTasks.removeHighest();
+//                if (highest == null) break;
+//                if (highest.isDeleted()) continue;
+//
+//                run(highest);
+//            }
+//            //commitNewTasks();
+//        }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

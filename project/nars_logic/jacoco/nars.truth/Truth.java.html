@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Truth.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.truth</a> &gt; <span class="el_source">Truth.java</span></div><h1>Truth.java</h1><pre class="source lang-java linenums">/*
+ * TruthValue.java
+ *
+ * Copyright (C) 2008  Pei Wang
+ *
+ * This file is part of Open-NARS.
+ *
+ * Open-NARS is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Open-NARS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Open-NARS.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package nars.truth;
+
+import nars.Global;
+import nars.Symbols;
+import nars.term.Term;
+import nars.term.atom.Atom;
+import nars.util.Texts;
+import nars.util.data.Util;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/** scalar (1D) truth value &quot;frequency&quot;, stored as a floating point value */
+public interface Truth extends MetaTruth&lt;Float&gt; {
+
+
+
+<span class="fc" id="L38">    Term Truth_TRUE = Atom.the(&quot;TRUE&quot;);</span>
+<span class="fc" id="L39">    Term Truth_FALSE = Atom.the(&quot;FALSE&quot;);</span>
+<span class="fc" id="L40">    Term Truth_UNSURE = Atom.the(&quot;UNSURE&quot;);</span>
+
+
+    /**
+     * Get the frequency value
+     *
+     * @return The frequency value
+     */
+    float getFrequency();
+
+    @NotNull
+    Truth setFrequency(float f);
+
+
+
+    /**
+     * Calculate the expectation value of the truth value
+     *
+     * @return The expectation value
+     */
+    default float getExpectation() {
+<span class="fc" id="L61">        return getExpectationPositive();</span>
+    }
+
+    /** expectation, the expectation of freq=1 */
+    default float getExpectationPositive() {
+<span class="fc" id="L66">        return expectation(getFrequency(), getConfidence());</span>
+    }
+
+
+    /** expectation inverse, the expectation of freq=0  */
+    default float getExpectationNegative() {
+<span class="nc" id="L72">        return expectation(1.0f - getFrequency(), getConfidence());</span>
+    }
+
+    static float expectation(float frequency, float confidence) {
+<span class="fc" id="L76">        return (confidence * (frequency - 0.5f) + 0.5f);</span>
+    }
+
+    /**
+     * Calculate the absolute difference of the expectation value and that of a
+     * given truth value
+     *
+     * @param t The given value
+     * @return The absolute difference
+     */
+    default float getExpDifAbs(@NotNull Truth t) {
+<span class="fc" id="L87">        return Math.abs(getExpectation() - t.getExpectation());</span>
+    }
+
+    /**
+     * Check if the truth value is negative
+     *
+     * @return True if the frequence is less than 1/2
+     */
+    default boolean isNegative() {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        return getFrequency() &lt; 0.5f;</span>
+    }
+
+
+    /**
+     * The hash code of a TruthValue, perfectly condensed,
+     * into the two 16-bit words of a 32-bit integer.
+     *
+     * Since the same epsilon used in other truth
+     * resolution here (Truth components do not need the full
+     * resolution of a floating point value, and also do not
+     * need the full resolution of a 16bit number when discretized)
+     * the hash value can be used for equality comparisons
+     * as well as non-naturally ordered / non-lexicographic
+     * but deterministic compareTo() ordering.
+     */
+    static int hash(@NotNull Truth t) {
+
+        //assuming epsilon is large enough such that: 0 &lt;= h &lt; 2^15:
+<span class="fc" id="L115">        int freqHash = Util.hash(t.getFrequency(), hashDiscreteness);</span>
+<span class="fc" id="L116">        int confHash = Util.hash(t.getConfidence(), hashDiscreteness);</span>
+
+<span class="fc" id="L118">        return (freqHash &lt;&lt; 16) | confHash;</span>
+    }
+
+    int hashDiscreteness = (int)(1.0f / Global.TRUTH_EPSILON);
+
+    @NotNull
+    @Override
+    default StringBuilder appendString(@NotNull StringBuilder sb) {
+<span class="nc" id="L126">        return appendString(sb, 2);</span>
+    }
+
+
+    /**
+     * A simplified String representation of a TruthValue, where each factor is
+     * accruate to 1%
+     */
+    @NotNull
+    default StringBuilder appendString(@NotNull StringBuilder sb, int decimals) {
+        /*String s1 = DELIMITER + frequency.toStringBrief() + SEPARATOR;
+        String s2 = confidence.toStringBrief();
+        if (s2.equals(&quot;1.00&quot;)) {
+            return s1 + &quot;0.99&quot; + DELIMITER;
+        } else {
+            return s1 + s2 + DELIMITER;
+        }*/
+        
+<span class="fc" id="L144">        sb.ensureCapacity(3 + 2 * (2 + decimals) );</span>
+<span class="fc" id="L145">        return sb</span>
+<span class="fc" id="L146">            .append(Symbols.TRUTH_VALUE_MARK)</span>
+<span class="fc" id="L147">            .append(Texts.n(getFrequency(), decimals))</span>
+<span class="fc" id="L148">            .append(Symbols.VALUE_SEPARATOR)</span>
+<span class="fc" id="L149">            .append(Texts.n(getConfidence(), decimals))</span>
+<span class="fc" id="L150">            .append(Symbols.TRUTH_VALUE_MARK);</span>
+    }
+
+
+
+
+    
+    /** displays the truth value as a short string indicating degree of true/false */
+    @Nullable
+    default String toTrueFalseString() {
+        //TODO:
+        //  F,f,~,t,T
+<span class="nc" id="L162">        return null;</span>
+    }
+
+    /** displays the truth value as a short string indicating degree of yes/no */
+    @Nullable
+    default String toYesNoString() {
+        //TODO
+        // N,n,~,y,Y
+<span class="nc" id="L170">        return null;</span>
+    }
+
+    
+    @NotNull
+    default Term toWordTerm(float trueExpectationThreshold) {
+<span class="nc" id="L176">        float e = getExpectation();</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (e &gt; trueExpectationThreshold) {</span>
+<span class="nc" id="L178">            return Truth_TRUE;</span>
+        }
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (e &lt; 1 - trueExpectationThreshold) {</span>
+<span class="nc" id="L181">            return Truth_FALSE;</span>
+        }
+<span class="nc" id="L183">        return Truth_UNSURE;</span>
+    }
+
+    @NotNull
+    default Truth set(float frequency, float confidence) {
+<span class="fc" id="L188">        setFrequency(frequency);</span>
+<span class="fc" id="L189">        setConfidence(confidence);</span>
+<span class="fc" id="L190">        return this;</span>
+    }
+
+    /** negation that modifies the truth instance itself */
+    @NotNull
+    default Truth negate() {
+        //final float f = 1 - getFrequency();
+<span class="nc" id="L197">        return setFrequency(1.0f - getFrequency());</span>
+    }
+
+    static int compare(@NotNull Truth a, @NotNull Truth b) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (a == b) return 0;</span>
+
+        //see how Truth hash() is calculated to know why this works
+<span class="fc" id="L204">        return Integer.compare(a.hashCode(), b.hashCode());</span>
+
+//        tc = Float.compare(truth.getFrequency(), otruth.getFrequency());
+//        if (tc!=0) return tc;
+//        tc = Float.compare(truth.getConfidence(), otruth.getConfidence());
+//        if (tc!=0) return tc;
+//
+//        return 0;
+    }
+
+    @NotNull
+    Truth mulConf(float f);
+
+
+
+<span class="nc" id="L219">    enum TruthComponent {</span>
+<span class="nc" id="L220">        Frequency, Confidence, Expectation</span>
+    }
+    
+    default float getComponent(@NotNull TruthComponent c) {
+<span class="nc bnc" id="L224" title="All 4 branches missed.">        switch (c) {</span>
+<span class="nc" id="L225">            case Frequency: return getFrequency();</span>
+<span class="nc" id="L226">            case Confidence: return getConfidence();</span>
+<span class="nc" id="L227">            case Expectation: return getExpectation();                </span>
+        }
+<span class="nc" id="L229">        return Float.NaN;</span>
+    }
+    
+    /** provides a statistics summary (mean, min, max, variance, etc..) of a particular TruthValue component across a given list of Truthables (sentences, TruthValue's, etc..).  null values in the iteration are ignored */
+    @NotNull
+    static DescriptiveStatistics statistics(@NotNull Iterable&lt;? extends Truthed&gt; t, @NotNull TruthComponent component) {
+<span class="nc" id="L235">        DescriptiveStatistics d = new DescriptiveStatistics();</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        for (Truthed x : t) {</span>
+<span class="nc" id="L237">            Truth v = x.getTruth();</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">            if (v!=null)</span>
+<span class="nc" id="L239">                d.addValue(v.getComponent(component));</span>
+<span class="nc" id="L240">        }</span>
+<span class="nc" id="L241">        return d;</span>
+    }
+
+
+
+    /** use getFrequency() when possible because this may box the result as a non-primitive */
+    @Override
+<span class="nc" id="L248">    default Float value() { return getFrequency(); }</span>
+
+
+    /** use setFrequency(v) when possible because this may box the result as a non-primitive */
+    @Override
+<span class="nc" id="L253">    default void setValue(Float v) { setFrequency(v); }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

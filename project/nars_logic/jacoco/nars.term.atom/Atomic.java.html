@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Atomic.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.atom</a> &gt; <span class="el_source">Atomic.java</span></div><h1>Atomic.java</h1><pre class="source lang-java linenums">package nars.term.atom;
+
+import nars.term.Term;
+import nars.term.Termed;
+import nars.term.compound.Compound;
+import nars.term.visit.SubtermVisitor;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.util.function.Predicate;
+
+/** Base class for Atomic types. */
+<span class="fc" id="L13">public abstract class Atomic implements Term {</span>
+
+
+    /** Assumes that the op()
+     *  is encoded within its string such that additional op()
+     *  comparison would be redundant. */
+    @Override public final boolean equals(Object u) {
+<span class="pc bpc" id="L20" title="1 of 4 branches missed.">        return (this == u) ||</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                ((u instanceof Termed) &amp;&amp; equalsTerm((Termed)u));</span>
+    }
+
+    private final boolean equalsTerm(@NotNull Termed t) {
+<span class="fc bfc" id="L25" title="All 4 branches covered.">        return (op()==t.op()) &amp;&amp; toString().equals(t.toString());</span>
+    }
+
+    @Override abstract public String toString();
+
+    @Override
+    public final int hashCode() {
+<span class="fc" id="L32">        return toString().hashCode();</span>
+    }
+
+    /**
+     * @param that The Term to be compared with the current Term
+     */
+    @Override public final int compareTo(@NotNull Object that) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (that==this) return 0;</span>
+
+<span class="fc" id="L41">        Termed t = (Termed)that;</span>
+        //TODO compare
+        //int d = op().compareTo(t.op());
+<span class="fc" id="L44">        int d = Integer.compare(op().ordinal(), t.op().ordinal());</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (d!=0) return d;</span>
+
+        //if the op is the same, it is required to be a subclass of Atomic
+        //which should have an ordering determined by its toString()
+<span class="fc" id="L49">        return toString().compareTo((/*(Atomic)*/that).toString());</span>
+    }
+
+
+
+    @Override
+    public final void recurseTerms(@NotNull SubtermVisitor v, Compound parent) {
+<span class="fc" id="L56">        v.accept(this, parent);</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override public final boolean and(@NotNull Predicate&lt;? super Term&gt; v) {
+<span class="fc" id="L60">        return v.test(this);</span>
+    }
+
+    @Override public final boolean or(@NotNull Predicate&lt;? super Term&gt; v) {
+<span class="fc" id="L64">        return and(v); //re-use and, even though it's so similar</span>
+    }
+
+    @Override
+    public final String toString(boolean pretty) {
+<span class="nc" id="L69">        return toString();</span>
+    }
+
+    @Override
+    public final void append(@NotNull Appendable w, boolean pretty) throws IOException {
+<span class="fc" id="L74">        w.append(toString());</span>
+<span class="fc" id="L75">    }</span>
+
+    /** preferably use toCharSequence if needing a CharSequence; it avoids a duplication */
+    @NotNull
+    @Override
+    public final StringBuilder toStringBuilder(boolean pretty) {
+<span class="nc" id="L81">        return new StringBuilder(toString());</span>
+    }
+
+    /** number of subterms; for atoms this must be zero */
+    @Override public final int size() {
+<span class="fc" id="L86">        return 0;</span>
+    }
+
+    /** atoms contain no subterms so impossible for anything to fit &quot;inside&quot; it */
+    @Override public final boolean impossibleSubTermVolume(int otherTermVolume) {
+<span class="nc" id="L91">        return true;</span>
+    }
+
+    @Override public final boolean containsTerm(Term t) {
+<span class="fc" id="L95">        return false;</span>
+    }
+
+    @Override public final boolean isCommutative() {
+<span class="nc" id="L99">        return false;</span>
+    }
+
+
+    /** default volume = 1 */
+<span class="fc" id="L104">    @Override public int volume() { return 1; }</span>
+
+
+    @Override
+    public abstract int varIndep();
+
+    @Override
+    public abstract int varDep();
+
+    @Override
+    public abstract int varQuery();
+
+    @Override
+    public int structure() {
+<span class="fc" id="L118">        return op().bit();</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

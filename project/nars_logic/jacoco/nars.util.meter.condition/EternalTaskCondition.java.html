@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>EternalTaskCondition.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.meter.condition</a> &gt; <span class="el_source">EternalTaskCondition.java</span></div><h1>EternalTaskCondition.java</h1><pre class="source lang-java linenums">package nars.util.meter.condition;
+
+
+import nars.Global;
+import nars.NAR;
+import nars.Narsese;
+import nars.nal.Tense;
+import nars.task.Task;
+import nars.task.Tasked;
+import nars.term.Term;
+import nars.term.Terms;
+import nars.term.compound.Compound;
+import nars.truth.DefaultTruth;
+import nars.truth.Truth;
+import nars.truth.Truthed;
+import nars.util.Texts;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+
+import java.io.PrintStream;
+import java.util.List;
+import java.util.TreeMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+public class EternalTaskCondition implements NARCondition, Predicate&lt;Task&gt;, Consumer&lt;Tasked&gt; {
+
+    //private static final Logger logger = LoggerFactory.getLogger(EternalTaskCondition.class);
+
+    protected final NAR nar;
+    private final char punc;
+    @Nullable
+    private final Term term;
+<span class="fc" id="L36">    boolean succeeded = false;</span>
+<span class="fc" id="L37">    long successTime = Tense.TIMELESS;</span>
+
+    //@Expose
+
+    //@JsonSerialize(using= JSONOutput.TermSerializer.class)
+    //public  Term term;
+
+    //@Expose
+    //public  char punc;
+
+    public  float freqMin;
+    public  float freqMax;
+    public  float confMin;
+    public  float confMax;
+    public  long creationStart, creationEnd; //-1 for not compared
+
+    /*float tenseCost = 0.35f;
+    float temporalityCost = 0.75f;*/
+
+
+    //private final Observed.DefaultObserved.DefaultObservableRegistration taskRemoved;
+
+    //@Expose
+    //protected long creationTime;
+
+
+    //@Expose
+    //public Tense tense = Tense.Eternal;
+
+
+<span class="fc" id="L67">    public final List&lt;Task&gt; valid = Global.newArrayList();</span>
+
+
+<span class="fc" id="L70">    final transient int maxSimilars = 3;</span>
+
+<span class="fc" id="L72">    protected final TreeMap&lt;Float,Task&gt; similar = new TreeMap();</span>
+
+//    @Override
+//    public final Truth getTruth() {
+//        return DefaultTruth.NULL;
+//    }
+
+<span class="fc" id="L79">    public EternalTaskCondition(NAR n, long creationStart, long creationEnd, String sentenceTerm, char punc, float freqMin, float freqMax, float confMin, float confMax) throws Narsese.NarseseException {</span>
+        //super(n.task(sentenceTerm + punc).normalize(n.memory));
+<span class="fc" id="L81">        nar = n;</span>
+
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (freqMax &lt; freqMin) throw new RuntimeException(&quot;freqMax &lt; freqMin&quot;);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (confMax &lt; confMin) throw new RuntimeException(&quot;confMax &lt; confMin&quot;);</span>
+
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (creationEnd - creationStart &lt; 1) throw new RuntimeException(&quot;cycleEnd must be after cycleStart by at least 1 cycle&quot;);</span>
+
+<span class="fc" id="L88">        this.creationStart = creationStart;</span>
+<span class="fc" id="L89">        this.creationEnd = creationEnd;</span>
+<span class="fc" id="L90">        this.freqMax = Math.min(1.0f, freqMax);</span>
+<span class="fc" id="L91">        this.freqMin = Math.max(0.0f, freqMin);</span>
+<span class="fc" id="L92">        this.confMax = Math.min(1.0f, confMax);</span>
+<span class="fc" id="L93">        this.confMin = Math.max(0.0f, confMin);</span>
+<span class="fc" id="L94">        this.punc = punc;</span>
+<span class="fc" id="L95">        this.term = Narsese.the().termRaw(sentenceTerm);</span>
+        //this.duration = n.memory.duration();
+<span class="fc" id="L97">    }</span>
+
+    @NotNull
+    public static String rangeStringN2(float min, float max) {
+<span class="fc" id="L101">        return &quot;(&quot; + Texts.n2(min) + ',' + Texts.n2(max) + ')';</span>
+    }
+
+    /** a heuristic for measuring the difference between terms
+     *  in range of 0..100%, 0 meaning equal
+     * */
+    public static float termDistance(@NotNull Term a, @NotNull Term b, float ifLessThan) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (a.equals(b)) return 0;</span>
+        //TODO handle TermMetadata terms
+
+<span class="fc" id="L111">        float dist = 0;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (a.op()!=b.op()) {</span>
+            //50% for equal term
+<span class="fc" id="L114">            dist += 0.2f;</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (dist &gt;= ifLessThan) return dist;</span>
+        }
+
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (a.size()!=b.size()) {</span>
+<span class="fc" id="L119">            dist += 0.2f;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (dist &gt;= ifLessThan) return dist;</span>
+        }
+
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (a instanceof Compound) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if ( ((Compound)a).t() != ((Compound)b).t()) {</span>
+<span class="fc" id="L125">                dist += 0.2f;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                if (dist &gt;= ifLessThan) return dist;</span>
+            }
+        }
+
+
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (a.structure()!=b.structure()) {</span>
+<span class="fc" id="L132">            dist += 0.2f;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (dist &gt;= ifLessThan) return dist;</span>
+        }
+
+        //HACK use toString for now
+<span class="fc" id="L137">        dist += Terms.levenshteinDistancePercent(</span>
+<span class="fc" id="L138">                a.toString(false),</span>
+<span class="fc" id="L139">                b.toString(false)) * 0.2f;</span>
+
+<span class="fc" id="L141">        return dist;</span>
+    }
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="fc" id="L147">        return term.toString() + punc + &quot; %&quot; +</span>
+<span class="fc" id="L148">                rangeStringN2(freqMin, freqMax) + ';' + rangeStringN2(confMin, confMax) + '%' + ' ' +</span>
+                &quot; creation: (&quot; + creationStart + ',' + creationEnd + ')';
+    }
+
+    //    public double getAcceptableDistanceThreshold() {
+//        return 0.01;
+//    }
+
+//    //how many multiples of the range it is away from the acceptable time interval
+//    public static double rangeError(double value, double min, double max, boolean squash) {
+//        double dt;
+//        if (value &lt; min)
+//            dt = min - value;
+//        else if (value &gt; max)
+//            dt = value - max;
+//        else
+//            return 0;
+//
+//        double result = dt/(max-min);
+//
+//        if (squash)
+//            return Math.tanh(result);
+//        else
+//            return result;
+//    }
+
+//    //time distance function
+//    public double getTimeDistance(long now) {
+//        return rangeError(now, creationStart, creationEnd, true);
+//    }
+
+//    //truth distance function
+//    public double getTruthDistance(Truth t) {
+//        //manhattan distance:
+//        return rangeError(t.getFrequency(), freqMin, freqMax, true) +
+//                rangeError(t.getConfidence(), confMin, confMax, true);
+//
+//        //we could also calculate geometric/cartesian vector distance
+//    }
+
+////    public void setRelativeOccurrenceTime(Tense t, int duration) {
+////        setRelativeOccurrenceTime(Stamp.getOccurrenceTime(t, duration), duration);
+////    }
+//    /** task's tense is compared by its occurence time delta to the current time when processing */
+//    public void setRelativeOccurrenceTime(long ocRelative, int duration) {
+//        //may be more accurate if duration/2
+//
+//        Tense tense;
+//        final float ocRel = ocRelative; //cast to float for this compare
+//        if (ocRel &gt; duration/2f) tense = Tense.Future;
+//        if (ocRel &lt; -duration/2f) tense = Tense.Past;
+//        else tense = Tense.Present;
+//
+//        setRelativeOccurrenceTime(tense, nar.memory.duration());
+//
+//    }
+
+
+//
+//    public void setRelativeOccurrenceTime(long creationTime, int ocRelative, int duration) {
+//        setCreationTime(creationTime);
+//        setRelativeOccurrenceTime(ocRelative, duration);
+//    }
+
+
+
+    public boolean matches(@Nullable Task task) {
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (task == null) {</span>
+<span class="nc" id="L216">            return false;</span>
+        }
+
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (!task.term().equals(term)) return false;</span>
+
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (task.getPunctuation() != punc)</span>
+<span class="fc" id="L222">            return false;</span>
+
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (!truthMatches(task))</span>
+<span class="fc" id="L225">            return false;</span>
+
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (!timeMatches(task))</span>
+<span class="nc" id="L228">            return false;</span>
+
+        //require exact term
+<span class="fc" id="L231">        return true;</span>
+
+    }
+
+    private boolean truthMatches(@NotNull Truthed task) {
+<span class="fc bfc" id="L236" title="All 4 branches covered.">        if ((punc == '.') || (punc == '!')) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (task.getTruth() == null) {</span>
+<span class="nc" id="L238">                return false;</span>
+            }
+<span class="fc" id="L240">            float fr = task.getFrequency();</span>
+<span class="fc" id="L241">            float co = task.getConfidence();</span>
+
+<span class="fc bfc" id="L243" title="All 8 branches covered.">            if ((co &gt; confMax) || (co &lt; confMin) || (fr &gt; freqMax) || (fr &lt; freqMin)) {</span>
+<span class="fc" id="L244">                return false;</span>
+            }
+        }
+<span class="fc" id="L247">        return true;</span>
+    }
+
+    public boolean timeMatches(@NotNull Task t) {
+<span class="pc bpc" id="L251" title="2 of 4 branches missed.">        return creationTimeMatches() &amp;&amp; occurrenceTimeMatches(t);</span>
+    }
+
+//    private boolean relativeTimeMatches(Task t) {
+//        if (term instanceof Compound) {
+//            return ((Compound)term).t() == t.term().t();
+//        }
+//        return true;
+//    }
+
+    final boolean creationTimeMatches() {
+<span class="fc" id="L262">        long now = nar.time();</span>
+<span class="pc bpc" id="L263" title="4 of 8 branches missed.">        return !(((creationStart != -1) &amp;&amp; (now &lt; creationStart)) ||</span>
+                ((creationEnd != -1) &amp;&amp; (now &gt; creationEnd)));
+    }
+
+    protected boolean occurrenceTimeMatches(@NotNull Task t) {
+<span class="fc" id="L268">        return (t.isEternal());</span>
+    }
+
+    @Override
+    public final boolean test(@NotNull Task task) {
+
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (matches(task)) {</span>
+<span class="fc" id="L275">            valid.add(task);</span>
+<span class="fc" id="L276">            succeeded = true;</span>
+<span class="fc" id="L277">            return true;</span>
+        }
+
+<span class="fc" id="L280">        recordSimilar(task);</span>
+<span class="fc" id="L281">        return false;</span>
+    }
+
+    public void recordSimilar(@NotNull Task task) {
+<span class="fc" id="L285">        final TreeMap&lt;Float, Task&gt; similar = this.similar;</span>
+
+        //TODO add the levenshtein distance of other task components
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">        float worstDiff = similar != null &amp;&amp; similar.size() &gt;= maxSimilars ? similar.lastKey() : Float.POSITIVE_INFINITY;</span>
+
+<span class="fc" id="L290">        float difference = 0;</span>
+<span class="fc" id="L291">        Compound tterm = task.term();</span>
+<span class="fc" id="L292">        difference +=</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                tterm.equals( term ) ? 0 : (term.volume());</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (difference &gt;= worstDiff)</span>
+<span class="nc" id="L295">            return;</span>
+
+<span class="fc" id="L297">        float f = task.getFrequency();</span>
+<span class="fc" id="L298">        float freqDiff = Math.min(</span>
+<span class="fc" id="L299">                Math.abs(f - freqMin),</span>
+<span class="fc" id="L300">                Math.abs(f - freqMax));</span>
+<span class="fc" id="L301">        difference += 2 * freqDiff;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (difference &gt;= worstDiff)</span>
+<span class="fc" id="L303">            return;</span>
+
+<span class="fc" id="L305">        float c = task.getConfidence();</span>
+<span class="fc" id="L306">        float confDiff = Math.min(</span>
+<span class="fc" id="L307">                Math.abs(c - confMin),</span>
+<span class="fc" id="L308">                Math.abs(c - confMax));</span>
+<span class="fc" id="L309">        difference += 1 * confDiff;</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (difference &gt;= worstDiff)</span>
+<span class="fc" id="L311">            return;</span>
+
+<span class="fc" id="L313">        float termDifference =</span>
+<span class="fc" id="L314">                termDistance(tterm, term, worstDiff);</span>
+<span class="fc" id="L315">        difference += 3 * termDifference;</span>
+
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (difference &gt;= worstDiff)</span>
+<span class="fc" id="L318">            return;</span>
+
+
+        //TODO more efficient way than this
+
+<span class="fc" id="L323">        this.similar.put(difference, task);</span>
+
+
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (similar.size() &gt; maxSimilars) {</span>
+<span class="fc" id="L327">            similar.remove(similar.lastEntry().getKey());</span>
+        }
+<span class="fc" id="L329">    }</span>
+
+
+
+//    public String getFalseReason() {
+//        String x = &quot;Unmatched; &quot;;
+//
+//        if (similar!=null) {
+//            x += &quot;Similar:\n&quot;;
+//            for (Map.Entry&lt;Double,Task&gt; et : similar.entrySet()) {
+//                Task tt = et.getValue();
+//                x += Texts.n4(et.getKey().floatValue()) + ' ' + tt.toString() + ' ' + tt.getLog() + '\n';
+//            }
+//        }
+//        else {
+//            x += &quot;No similar: &quot; + term;
+//        }
+//        return x;
+//    }
+
+    @NotNull
+    public Truth getTruthMean() {
+<span class="nc" id="L351">        return new DefaultTruth(0.5f * (freqMax + freqMin), 0.5f * (confMax + confMin));</span>
+    }
+
+
+//    public List&lt;Task&gt; getTrueReasons() {
+//        return valid;
+//        //if (!isTrue()) throw new RuntimeException(this + &quot; is not true so has no true reasons&quot;);
+//        /*return Lists.newArrayList(&quot;match at: &quot; +
+//
+//                Iterables.transform(trueAt, new Function&lt;Task, String&gt;() {
+//                    @Override
+//                    public String apply(Task task) {
+//                        return task.toString() + &quot; @ &quot; + task.sentence.getCreationTime();
+//                    }
+//                }));
+//                */
+//        //return exact;
+//    }
+
+//    @Override
+//    public String toString() {
+//        return succeeded  +&quot;: &quot;  + JSONOutput.stringFromFields(this);
+//    }
+
+
+    @Override
+    public final void accept(@NotNull Tasked tasked) {
+<span class="fc" id="L378">        Task task = tasked.getTask();</span>
+<span class="fc" id="L379">        accept(task);</span>
+<span class="fc" id="L380">    }</span>
+
+    public final void accept(@NotNull Task task) {
+
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (succeeded) return; //no need to test any further</span>
+
+
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (test(task)) {</span>
+<span class="fc" id="L388">            succeeded = true;</span>
+<span class="fc" id="L389">            successTime = nar.time();</span>
+        } else {
+            //logger.info(&quot;non-matched: {}&quot;, task);
+            //logger.info(&quot;\t{}&quot;, task.getLogLast());
+        }
+
+<span class="fc" id="L395">    }</span>
+
+    @Override
+    public final long getSuccessTime() {
+<span class="nc" id="L399">        return successTime;</span>
+    }
+
+    @Override
+    public long getFinalCycle() {
+<span class="fc" id="L404">        return creationEnd;</span>
+    }
+
+
+    /** calculates the &quot;cost&quot; of an execution according to certain evaluated condtions
+     *  this is the soonest time at which all output conditions were successful.
+     *  if any conditions were not successful, the cost is infinity
+     * */
+    public static double cost(@NotNull Iterable&lt;EternalTaskCondition&gt; conditions) {
+<span class="nc" id="L413">        long lastSuccess = Tense.TIMELESS;</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        for (EternalTaskCondition e : conditions) {</span>
+<span class="nc" id="L415">            long est = e.successTime;</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            if (est != Tense.TIMELESS) {</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                if (lastSuccess &lt; est) {</span>
+<span class="nc" id="L418">                    lastSuccess = est;</span>
+                }
+            }
+<span class="nc" id="L421">        }</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">        if (lastSuccess != Tense.TIMELESS) {</span>
+            //score = 1.0 + 1.0 / (1+lastSuccess);
+<span class="nc" id="L424">            return lastSuccess;</span>
+        }
+
+<span class="nc" id="L427">        return Double.POSITIVE_INFINITY;</span>
+    }
+
+    /** returns a function of the cost characterizing the optimality of the conditions
+     *  monotonically increasing from -1..+1 (-1 if there were errors,
+     *  0..1.0 if all successful.  limit 0 = takes forever, limit 1.0 = instantaneous
+     */
+    public static double score(@NotNull List&lt;EternalTaskCondition&gt; requirements) {
+<span class="nc" id="L435">        double cost = cost(requirements);</span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        return Double.isFinite(cost) ? 1.0 / (1.0 + cost) : -1;</span>
+
+    }
+
+    @Override
+    public final boolean isTrue() {
+<span class="fc" id="L442">        return succeeded;</span>
+    }
+
+    @Override
+    public void toString(@NotNull PrintStream out) {
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        out.println(succeeded ? &quot; OK&quot; : &quot;ERR&quot; + '\t' + toString());</span>
+
+<span class="nc" id="L449">        BiConsumer&lt;String,Task&gt; printer = (label,s) -&gt; {</span>
+<span class="nc" id="L450">            out.print('\t' + label + ' ');</span>
+<span class="nc" id="L451">            out.println(s.getExplanation().replace(&quot;\n&quot;, &quot;\n\t\t&quot;));</span>
+<span class="nc" id="L452">        };</span>
+
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        if (valid!=null) {</span>
+<span class="nc" id="L455">            valid.forEach(s -&gt; printer.accept(&quot;VALID&quot;, s));</span>
+        }
+<span class="nc bnc" id="L457" title="All 2 branches missed.">        if (similar!=null) {</span>
+<span class="nc" id="L458">            similar.values().forEach(s -&gt; printer.accept(&quot;SIMILAR&quot;, s));</span>
+        }
+<span class="nc" id="L460">    }</span>
+
+    @Override
+    public void toLogger(@NotNull Logger logger) {
+<span class="fc bfc" id="L464" title="All 2 branches covered.">        String msg = succeeded ? &quot; OK&quot; : &quot;ERR&quot; + '\t' + toString();</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (succeeded)</span>
+<span class="fc" id="L466">            logger.info(msg);</span>
+        else
+<span class="fc" id="L468">            logger.warn(msg);</span>
+
+
+
+
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">        if (valid!=null) {</span>
+<span class="fc" id="L474">            valid.forEach( s -&gt; {</span>
+<span class="fc" id="L475">                logger.trace(&quot;\t{}&quot;, s);</span>
+                //logger.debug(&quot;\t\t{}&quot;, s.getLog());
+                //logger.debug(s.getExplanation().replace(&quot;\n&quot;, &quot;\n\t\t&quot;));
+<span class="fc" id="L478">            });</span>
+        }
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">        if (similar!=null) {</span>
+<span class="fc" id="L481">            similar.values().forEach(s -&gt; {</span>
+<span class="fc" id="L482">                logger.info(&quot;\t{}&quot;, s);</span>
+<span class="fc" id="L483">                logger.debug(&quot;\t\t{}&quot;, s.getParentTask() + &quot; , &quot; + s.getParentBelief());</span>
+<span class="fc" id="L484">                logger.debug(&quot;\t\t{}&quot;, s.getLog());</span>
+                //logger.debug(s.getExplanation().replace(&quot;\n&quot;, &quot;\n\t\t&quot;));
+<span class="fc" id="L486">            });</span>
+        }
+<span class="fc" id="L488">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

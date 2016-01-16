@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MapIndex.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.index</a> &gt; <span class="el_source">MapIndex.java</span></div><h1>MapIndex.java</h1><pre class="source lang-java linenums">package nars.term.index;
+
+import nars.term.TermContainer;
+import nars.term.Termed;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Map;
+import java.util.function.Consumer;
+
+/**
+ * Created by me on 12/7/15.
+ */
+public class MapIndex extends AbstractMapIndex {
+
+    public final Map&lt;Termed, Termed&gt; data;
+    public final Map&lt;TermContainer, TermContainer&gt; subterms;
+
+
+//    public MapIndex() {
+//        this(Global.newHashMap(), Global.newHashMap());
+//    }
+
+    public MapIndex(Map&lt;Termed, Termed&gt; data, Map&lt;TermContainer, TermContainer&gt; subterms) {
+<span class="fc" id="L24">        super();</span>
+<span class="fc" id="L25">        this.data = data;</span>
+<span class="fc" id="L26">        this.subterms = subterms;</span>
+<span class="fc" id="L27">    }</span>
+
+
+
+    @Override
+    public final Termed getTermIfPresent(Termed t) {
+<span class="fc" id="L33">        return data.get(t);</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="fc" id="L38">        data.clear();</span>
+<span class="fc" id="L39">        subterms.clear();</span>
+<span class="fc" id="L40">    }</span>
+
+    @Override
+    public int subtermsCount() {
+<span class="fc" id="L44">        return subterms.size();</span>
+    }
+
+//    @Override
+//    public Object remove(Term key) {
+//        return data.remove(key);
+//    }
+
+    @Override
+    public void putTerm(Termed termed) {
+<span class="fc" id="L54">        data.put(termed, termed);</span>
+<span class="fc" id="L55">    }</span>
+
+    @Override
+    public int size() {
+<span class="fc" id="L59">        return data.size();</span>
+    }
+
+
+    @Override
+    protected void putSubterms(TermContainer s) {
+<span class="fc" id="L65">        this.subterms.put(s,s);</span>
+<span class="fc" id="L66">    }</span>
+
+    @Override protected TermContainer getSubtermsIfPresent(TermContainer subterms) {
+<span class="fc" id="L69">        return this.subterms.get(subterms);</span>
+    }
+
+
+    @Override
+    public final void forEach(@NotNull Consumer&lt;? super Termed&gt; c) {
+<span class="fc" id="L75">        data.forEach((k, v) -&gt; c.accept(v));</span>
+<span class="fc" id="L76">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

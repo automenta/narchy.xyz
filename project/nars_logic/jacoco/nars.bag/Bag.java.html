@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Bag.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.bag</a> &gt; <span class="el_source">Bag.java</span></div><h1>Bag.java</h1><pre class="source lang-java linenums">package nars.bag;
+
+import nars.budget.Budget;
+import nars.util.data.Util;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.io.PrintStream;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+
+
+/**
+ * K=key, V = item/value of type Item
+ * &lt;p&gt;
+ * TODO remove unnecessary methods, documetn
+ * TODO implement java.util.Map interface
+ */
+public interface Bag&lt;V&gt; extends Table&lt;V, BLink&lt;V&gt;&gt;, Consumer&lt;V&gt;, Supplier&lt;BLink&lt;V&gt;&gt;, Iterable&lt;BLink&lt;V&gt;&gt; {
+
+
+
+
+
+    /**
+     * returns the bag to an empty state
+     */
+    @Override
+    void clear();
+
+    /**
+     * gets the next value without removing changing it or removing it from any index.  however
+     * the bag is cycled so that subsequent elements are different.
+     */
+    @Nullable
+    BLink&lt;V&gt; sample();
+
+
+    /**
+     * TODO rename 'remove'
+     *
+     * @param key
+     * @return
+     */
+    @Nullable
+    @Override
+    BLink&lt;V&gt; remove(V key);
+
+
+    /**
+     * put with an empty budget
+     */
+    @Nullable
+    BLink&lt;V&gt; put(Object newItem);
+
+    @Nullable
+    default BLink&lt;V&gt; put(Object i, Budget b) {
+<span class="fc" id="L61">        return put(i, b, 1f);</span>
+    }
+
+    @Nullable
+    @Override
+    default BLink&lt;V&gt; put(V v, BLink&lt;V&gt; b) {
+<span class="fc" id="L67">        return put(v, b, 1f);</span>
+    }
+
+    @Nullable
+    BLink&lt;V&gt; put(Object i, Budget b, float scale);
+
+
+
+
+//    /**
+//     * iterates in sequence starting from the top until predicate returns false, limited by max iterations (n)
+//     */
+//    abstract public void top(int n, Predicate&lt;BagBudget&lt;V&gt;&gt; each);
+//        int[] toFire = { n };
+//        top(c -&gt; (each.test(c) &amp;&amp; (toFire[0]--) &gt; 0));
+
+
+    default void sample(int n, Collection&lt;BLink&lt;V&gt;&gt; target) {
+<span class="fc" id="L85">        sample(n, null, target);</span>
+<span class="fc" id="L86">    }</span>
+
+    @NotNull
+    Bag&lt;V&gt; sample(int n, Predicate&lt;BLink&lt;V&gt;&gt; each, Collection&lt;BLink&lt;V&gt;&gt; target);
+//    /**
+//     * fills a collection with at-most N items, if an item passes the predicate.
+//     * returns how many items added
+//     */
+//    public int sample(int n, Predicate&lt;BagBudget&lt;V&gt;&gt; each, Collection&lt;BagBudget&lt;V&gt;&gt; target) {
+//        int startSize = target.size();
+//        sample(n, x -&gt; {
+//            if (each.test(x)) {
+//                target.add(x);
+//            }
+//            return true;
+//        });
+//        return target.size() - startSize;
+//    }
+
+
+
+//    /**
+//     * Get an Item by key
+//     *
+//     * @param key The key of the Item
+//     * @return The Item with the given key
+//     */
+//    @Override
+//    public abstract V get(K key);
+
+//    public abstract Set&lt;K&gt; keySet();
+
+    int capacity();
+
+    /**
+     * Choose an Item according to distribution policy and take it out of the Bag
+     * TODO rename removeNext()
+     *
+     * @return The selected Item, or null if this bag is empty
+     */
+    @Nullable
+    BLink&lt;V&gt; pop();
+
+    /**
+     * The number of items in the bag
+     *
+     * @return The number of items
+     */
+    @Override int size();
+
+
+
+    default float getPriorityMean() {
+<span class="nc" id="L139">        int s = size();</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (s == 0) return 0;</span>
+<span class="nc" id="L141">        return getPrioritySum() / s;</span>
+    }
+
+    default float getSummaryMean() {
+<span class="nc" id="L145">        int s = size();</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (s == 0) return 0;</span>
+<span class="nc" id="L147">        return getSummarySum() / s;</span>
+    }
+
+//    /** not used currently in Bag classes, but from CacheBag interface */
+//    @Override public Consumer&lt;V&gt; getOnRemoval() {  return null;    }
+//    /** not used currently in Bag classes, but from CacheBag interface */
+//    @Override public void setOnRemoval(Consumer&lt;V&gt; onRemoval) { }
+
+    /**
+     * iterates all items in (approximately) descending priority
+     * forEach may be used to avoid allocation of iterator instances
+     */
+    @Nullable
+    @Override
+    Iterator&lt;BLink&lt;V&gt;&gt; iterator();
+
+    /**
+     * Check if an item is in the bag.  both its key and its value must match the parameter
+     *
+     * @param it An item
+     * @return Whether the Item is in the Bag
+     */
+    default boolean contains(V it) {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        return get(it) != null;</span>
+    }
+
+
+    //    /**
+//     * if the next item is true via the predicate, then it is TAKEn out of the bag; otherwise the item remains unaffected
+//     */
+//    public final V remove(final Predicate&lt;V&gt; iff) {
+//        V v = peekNext();
+//
+//        if (v == null) return null;
+//        if (iff.apply(v)) {
+//            remove(v.name());
+//            return v;
+//        }
+//        return null;
+//    }
+
+
+    /**
+     * commits the next set of changes and updates any sorting
+     */
+    void commit();
+
+    /**
+     * implements the Consumer&lt;V&gt; interface; invokes a put()
+     */
+    @Override
+    default void accept(V v) {
+<span class="nc" id="L199">        put(v);</span>
+<span class="nc" id="L200">    }</span>
+
+    /**
+     * implements the Supplier&lt;V&gt; interface; invokes a remove()
+     */
+    @Nullable
+    @Override
+    default BLink&lt;V&gt; get() {
+<span class="nc" id="L208">        return pop();</span>
+    }
+
+
+
+    default void printAll() {
+<span class="nc" id="L214">        printAll(System.out);</span>
+<span class="nc" id="L215">    }</span>
+
+    default void printAll(@NotNull PrintStream p) {
+<span class="nc" id="L218">        top(b -&gt; p.println(b.toBudgetString() + ' ' + b.get()));</span>
+<span class="nc" id="L219">    }</span>
+
+    /**
+     * should visit items highest priority first, if possible.
+     * for some bags this may not be possible.
+     */
+    //by default this will use iterator().forEach() but this can be used to make sure each implementation offers its best
+    //@Override abstract public void forEach(final Consumer&lt;? super V&gt; action);
+    default float getPrioritySum() {
+<span class="nc" id="L228">        float[] total = {0};</span>
+<span class="nc" id="L229">        top(v -&gt; total[0] += v.getPriority());</span>
+<span class="nc" id="L230">        return total[0];</span>
+    }
+
+    default float getSummarySum() {
+<span class="nc" id="L234">        float[] total = {0};</span>
+<span class="nc" id="L235">        top(v -&gt; total[0] += v.summary());</span>
+<span class="nc" id="L236">        return total[0];</span>
+    }
+
+
+//    final public int forgetNext(float forgetCycles, final V[] batch, final long now) {
+//        return forgetNext(forgetCycles, batch, 0, batch.length, now, batch.length/2 /* default to max 1.5x */);
+//    }
+
+//    /** warning: slow */
+//    public double getStdDev(StandardDeviation target) {
+//        target.clear();
+//        forEachEntry(x -&gt; target.increment(x.getPriority()));
+//        return target.getResult();
+//    }
+
+
+
+
+    /**
+     * slow, probably want to override in subclasses
+     */
+    default float getPriorityMin() {
+<span class="nc" id="L258">        float[] min = {Float.POSITIVE_INFINITY};</span>
+<span class="nc" id="L259">        top(b -&gt; {</span>
+<span class="nc" id="L260">            float p = b.getPriority();</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (p &lt; min[0]) min[0] = p;</span>
+<span class="nc" id="L262">        });</span>
+<span class="nc" id="L263">        return min[0];</span>
+    }
+
+    /**
+     * slow, probably want to override in subclasses
+     */
+    default float getPriorityMax() {
+<span class="nc" id="L270">        float[] max = {Float.NEGATIVE_INFINITY};</span>
+<span class="nc" id="L271">        top(b -&gt; {</span>
+<span class="nc" id="L272">            float p = b.getPriority();</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            if (p &gt; max[0]) max[0] = p;</span>
+<span class="nc" id="L274">        });</span>
+<span class="nc" id="L275">        return max[0];</span>
+    }
+
+
+    /**
+     * default implementation; more optimal implementations will avoid instancing an iterator
+     */
+    default void forEach(int max, @NotNull Consumer&lt;? super BLink&lt;V&gt;&gt; action) {
+
+<span class="nc" id="L284">        Iterator&lt;BLink&lt;V&gt;&gt; ii = iterator();</span>
+<span class="nc" id="L285">        int n = 0;</span>
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        while (ii.hasNext() &amp;&amp; (n++ &lt; max)) {</span>
+<span class="nc" id="L287">            action.accept(ii.next());</span>
+        }
+
+<span class="nc" id="L290">    }</span>
+
+
+    void setCapacity(int c);
+
+
+//    /**
+//     * for bags which maintain a separate name index from the items, more fine-granied access methods to avoid redundancy when possible
+//     */
+//    @Deprecated
+//    abstract public static class IndexedBag&lt;E extends Item&lt;K&gt;, K&gt; extends Bag&lt;K, E&gt; {
+//
+//        public E TAKE(final K key) {
+//            return take(key, true);
+//        }
+//
+//
+//        /**
+//         * registers the item
+//         */
+//        abstract protected void index(E value);
+//
+//        /**
+//         * unregisters it
+//         */
+//        abstract protected E unindex(K key);
+//
+//        protected E unindex(E e) {
+//            return unindex(e.name());
+//        }
+//
+//        abstract public E take(final K key, boolean unindex);
+//
+//        public E TAKE(E value) {
+//            return TAKE(value.name());
+//        }
+//
+//
+//        /**
+//         * Insert an item into the itemTable, and return the overflow
+//         *
+//         * @param newItem The Item to put in
+//         * @return null if nothing was displaced and if the item itself replaced itself,
+//         * or the The overflow Item if a different item had to be removed
+//         */
+//        abstract protected E addItem(final E newItem, boolean index);
+//
+//        public E PUT(final E newItem) {
+//            return addItem(newItem, true);
+//        }
+//
+//
+//        /**
+//         * Add a new Item into the Bag via a BagSelector interface for lazy or cached instantiation of Bag items
+//         *
+//         * @return the item which was removed, which may be the input item if it could not be inserted; or null if nothing needed removed
+//         * &lt;p/&gt;
+//         * WARNING This indexing-avoiding version not completely working yet, so it is not used as of this commit
+//         */
+//
+//        public E putInFast(BagSelector&lt;K, E&gt; selector) {
+//
+//            E item = take(selector.name(), false);
+//
+//            if (item != null) {
+//                item = (E) item.merge(selector);
+//                final E overflow = addItem(item, false);
+//                if (overflow == item) {
+//                    unindex(item.name());
+//                }
+//                return overflow;
+//            } else {
+//                item = selector.newItem();
+//
+//                //compare by reference, sanity check
+//                if (item.name() != selector.name())
+//                    throw new RuntimeException(&quot;Unrecognized selector and resulting new instance have different name()'s: item=&quot; + item.name() + &quot; selector=&quot; + selector.name());
+//
+//                // put the (new or merged) item into itemTable
+//                return PUT(item);
+//            }
+//
+//
+//        }
+//    }
+
+    @NotNull
+    default double[] getPriorityHistogram(int bins) {
+<span class="fc" id="L378">        return getPriorityHistogram(new double[bins]);</span>
+    }
+
+    @NotNull
+    default double[] getPriorityHistogram(@NotNull double[] x) {
+<span class="fc" id="L383">        int bins = x.length;</span>
+<span class="fc" id="L384">        top(budget -&gt; {</span>
+<span class="fc" id="L385">            float p = budget.getPriority();</span>
+<span class="fc" id="L386">            int b = Util.bin(p, bins - 1);</span>
+<span class="fc" id="L387">            x[b]++;</span>
+<span class="fc" id="L388">        });</span>
+<span class="fc" id="L389">        double total = 0;</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (double e : x) {</span>
+<span class="fc" id="L391">            total += e;</span>
+        }
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">        if (total &gt; 0) {</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">            for (int i = 0; i &lt; bins; i++)</span>
+<span class="fc" id="L395">                x[i] /= total;</span>
+        }
+<span class="fc" id="L397">        return x;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

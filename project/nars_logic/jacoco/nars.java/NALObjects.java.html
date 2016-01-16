@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>NALObjects.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.java</a> &gt; <span class="el_source">NALObjects.java</span></div><h1>NALObjects.java</h1><pre class="source lang-java linenums">package nars.java;
+
+import com.gs.collections.api.map.MutableMap;
+import com.gs.collections.impl.map.mutable.UnifiedMap;
+import javassist.util.proxy.MethodHandler;
+import javassist.util.proxy.ProxyFactory;
+import javassist.util.proxy.ProxyObject;
+import nars.$;
+import nars.Global;
+import nars.NAR;
+import nars.nal.Tense;
+import nars.nal.nal8.Operator;
+import nars.task.Task;
+import nars.term.Term;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
+
+
+/**
+ * Dynamic proxy for any POJO that intercepts specific
+ * methods and generates reasoner events which can be
+ * stored, input to one or more reasoners, etc..
+ * &lt;p&gt;
+ *
+ * TODO option to include stack traces in conjunction with invocation
+ *
+ */
+public class NALObjects extends DefaultTermizer implements Termizer, MethodHandler {
+
+    private final NAR nar;
+<span class="fc" id="L42">    final MutableMap&lt;Class, ProxyFactory&gt; proxyCache = new UnifiedMap().asSynchronized();</span>
+
+    //    final Map&lt;Object, Term&gt; instances = new com.google.common.collect.MapMaker()
+//            .concurrencyLevel(4).weakKeys().makeMap();
+    //final HashBiMap&lt;Object,Term&gt; instances = new HashBiMap();
+
+<span class="fc" id="L48">    final Map&lt;Method,MethodOperator&gt; methodOps = Global.newHashMap();</span>
+
+
+
+    @NotNull
+<span class="fc" id="L53">    public static Set&lt;String&gt; methodExclusions = new HashSet&lt;String&gt;() {{</span>
+<span class="fc" id="L54">        add(&quot;hashCode&quot;);</span>
+<span class="fc" id="L55">        add(&quot;notify&quot;);</span>
+<span class="fc" id="L56">        add(&quot;notifyAll&quot;);</span>
+<span class="fc" id="L57">        add(&quot;wait&quot;);</span>
+<span class="fc" id="L58">        add(&quot;finalize&quot;);</span>
+<span class="fc" id="L59">        add(&quot;stream&quot;);</span>
+<span class="fc" id="L60">        add(&quot;getHandler&quot;);</span>
+<span class="fc" id="L61">        add(&quot;setHandler&quot;);</span>
+<span class="fc" id="L62">    }};</span>
+
+<span class="fc" id="L64">    private final AtomicBoolean goalInvoke = new AtomicBoolean(true);</span>
+
+    /** for externally-puppeted method invocation goals */
+<span class="fc" id="L67">    private float invocationGoalFreq = 1.0f;</span>
+<span class="fc" id="L68">    private float invocationGoalConf = 0.9f;</span>
+
+//    /** for method invocation result beliefs  */
+//    private float invocationResultFreq = 1f;
+//    private float invocationResultConf = 0.9f;
+
+    /** for meta-data beliefs about (classes, objects, packages, etc..) */
+<span class="fc" id="L75">    private float metadataBeliefFreq = 1.0f;</span>
+<span class="fc" id="L76">    private float metadataBeliefConf = 0.99f;</span>
+<span class="fc" id="L77">    private float metadataPriority = 0.1f;</span>
+
+
+<span class="fc" id="L80">    public NALObjects(NAR n) {</span>
+<span class="fc" id="L81">        nar = n;</span>
+<span class="fc" id="L82">    }</span>
+
+    @NotNull
+    public static &lt;N extends NAR&gt; N wrap(@NotNull N n) throws Exception {
+<span class="nc" id="L86">        NALObjects nalObjects = new NALObjects(n);</span>
+<span class="nc" id="L87">        return nalObjects.wrap(&quot;this&quot;, n);</span>
+    }
+
+    @Override
+    protected Term termClassInPackage(Term classs, Term packagge) {
+<span class="fc" id="L92">        Term t = $.inst(classs, packagge);</span>
+<span class="fc" id="L93">        nar.believe(metadataPriority, t,</span>
+                Tense.ETERNAL,
+                metadataBeliefFreq, metadataBeliefConf);
+<span class="fc" id="L96">        return t;</span>
+    }
+
+
+    @Override
+    protected void onInstanceOfClass(Object o, Term oterm, Term clas) {
+        /** only point to type if non-numeric? */
+        //if (!Primitives.isWrapperType(instance.getClass()))
+
+        //nar.believe(Instance.make(oterm, clas));
+<span class="fc" id="L106">    }</span>
+
+    protected void onInstanceOfClass(Term identifier, Term clas) {
+<span class="fc" id="L109">        nar.believe(metadataPriority, $.inst(identifier, clas),</span>
+            Tense.ETERNAL,
+            metadataBeliefFreq, metadataBeliefConf);
+<span class="fc" id="L112">    }</span>
+
+    @Override
+    protected void onInstanceChange(Term oterm, Term prevOterm) {
+
+<span class="nc" id="L117">        Term s = $.sim(oterm, prevOterm);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (s instanceof Compound)</span>
+<span class="nc" id="L119">            nar.believe(metadataPriority, ((Compound)s),</span>
+                Tense.ETERNAL,
+                metadataBeliefFreq, metadataBeliefConf);
+
+<span class="nc" id="L123">    }</span>
+
+<span class="fc" id="L125">    final AtomicBoolean lock = new AtomicBoolean(false);</span>
+
+    /** non-null if the method is being invoked by NARS,
+     * in which case it will reference the task that invoked
+     * feedback will be handled by the responsible MethodOperator's execution */
+<span class="fc" id="L130">    final AtomicReference&lt;Task&gt; volition = new AtomicReference();</span>
+
+
+//    /** when a proxy wrapped instance method is called, this can
+//     *  parametrically intercept arguments and return value
+//     *  and input them to the NAL in narsese.
+//     */
+//    @Override
+//    public Object invoke(Object object, Method overridden, Method forwarder, Object[] args) throws Throwable {
+//        Object result = forwarder.invoke(object, args);
+//        return invoked( object, overridden, args, result);
+//    }
+
+    public static class InvocationResult {
+        public final Term value;
+
+<span class="fc" id="L146">        public InvocationResult(Term value) {</span>
+<span class="fc" id="L147">            this.value = value;</span>
+<span class="fc" id="L148">        }</span>
+
+        @NotNull
+        @Override
+        public String toString() {
+<span class="fc" id="L153">            return &quot;Puppet&quot;;</span>
+        }
+    }
+
+    //TODO run in separate execution context to avoid synchronized
+    @Nullable
+    public synchronized Object invoked(Object object, @NotNull Method method, Object[] args, @Nullable Object result) {
+
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (methodExclusions.contains(method.getName()))</span>
+<span class="fc" id="L162">            return result;</span>
+
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (!lock.compareAndSet(false,true)) {</span>
+<span class="nc" id="L165">            return result;</span>
+        }
+
+<span class="fc" id="L168">        Operator op = getMethodOperator(method);</span>
+
+
+<span class="fc" id="L171">        Compound invocationArgs = getMethodInvocationTerms(method, object, args);</span>
+
+
+
+        Term effect;
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        effect = result != null ? term(result) : VOID;</span>
+
+        //TODO re-use static copy for 'VOID' instances
+<span class="fc" id="L179">        InvocationResult ir = new InvocationResult(effect);</span>
+
+<span class="fc" id="L181">        Task volitionTask = volition.get();</span>
+
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (volitionTask == null) {</span>
+
+            /** pretend as if it were a goal of its own volition, although it was invoked externally
+             *  Master of puppets, I'm pulling your strings */
+<span class="fc" id="L187">            nar.input( $.goal( $.oper(op, invocationArgs),</span>
+                    invocationGoalFreq, invocationGoalConf).
+<span class="fc" id="L189">                    present(nar.memory).</span>
+<span class="fc" id="L190">                    because(ir)</span>
+            );
+
+//            nar.input(
+//                new FluentTask(Operation.result(op, invocationArgs, effect)).
+//                        belief().
+//                        truth(invocationResultFreq, invocationResultConf).
+//                        present(nar.memory).parent(g).
+//                        budget(g.getBudget()).
+//                        because(&quot;External Invocation&quot;)
+//                    );
+        }
+        else {
+            //feedback will be returned via operation execution
+            //System.out.println(&quot;VOLITION &quot; + volitionTask);
+        }
+
+
+<span class="fc" id="L208">        lock.set(false);</span>
+
+<span class="fc" id="L210">        return result;</span>
+    }
+
+    private Compound getMethodInvocationTerms(@NotNull Method method, Object instance, Object[] args) {
+
+        //TODO handle static methods
+
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        boolean isVoid = method.getReturnType() == void.class;</span>
+
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        Term[] x = new Term[isVoid ? 2 : 3];</span>
+<span class="fc" id="L220">        x[0] = term(instance);</span>
+<span class="fc" id="L221">        x[1] = $.p(terms(args));</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (!isVoid) {</span>
+<span class="fc" id="L223">            x[2] = $.varDep(&quot;returnValue&quot;);</span>
+        }
+<span class="fc" id="L225">        return $.p(x);</span>
+    }
+
+    private Term[] terms(Object[] args) {
+        //TODO use direct array creation, not Stream
+<span class="fc" id="L230">        return Stream.of(args).map(this::term).toArray(Term[]::new);</span>
+    }
+
+    @NotNull
+    public static Operator getMethodOperator(@NotNull Method overridden) {
+        //dereference class to origin, not using a wrapped class
+<span class="fc" id="L236">        Class c = overridden.getDeclaringClass();</span>
+
+        //HACK
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (c.getName().contains(&quot;_$$_&quot;)) ////javassist wrapper class</span>
+<span class="fc" id="L240">            c = c.getSuperclass();</span>
+
+<span class="fc" id="L242">        return Operator.the(</span>
+<span class="fc" id="L243">            c.getSimpleName() + '_' + overridden.getName()</span>
+        );
+    }
+
+//    //TODO use a generic Consumer&lt;Task&gt; for recipient/recipients of these
+//    public final NAR nar;
+//
+//    public NALProxyMethodHandler(NAR n /* options */) {
+//
+//    }
+    //    private final List&lt;NALObjMethodHandler&gt; methodHandlers = Global.newArrayList();
+//
+//    public NALObject() {
+//    }
+//
+//    public NALObject add(NALObjMethodHandler n) {
+//        methodHandlers.add(n);
+//        return this;
+//    }
+//
+
+    @NotNull
+    public &lt;T&gt; T wrap(String id, @NotNull Class&lt;? extends T&gt; instance) throws Exception {
+        //TODO avoid creating 't' because it will not be used. create the proxy class directly from the class
+<span class="nc" id="L267">        T t = instance.newInstance();</span>
+<span class="nc" id="L268">        return wrap(id, t);</span>
+    }
+
+    /** the id will be the atom term label for an instance.
+     *  the instance should not be used because a new instance
+     *  will be created and its fields will be those
+     *  which are manipulated, not the original prototype.
+     * */
+    @NotNull
+    public &lt;T&gt; T wrap(String id, @NotNull T instance) throws Exception {
+
+<span class="fc" id="L279">        return wrap(id, (Class&lt;? extends T&gt;)instance.getClass(), instance);</span>
+
+    }
+
+    @Nullable
+    public synchronized Object invokeVolition(Task currentTask, @NotNull Method method, Object instance, Object[] args) {
+
+<span class="nc" id="L286">        Object result = null;</span>
+
+<span class="nc" id="L288">        volition.set(currentTask);</span>
+
+        try {
+<span class="nc" id="L291">            result = method.invoke(instance, args);</span>
+<span class="nc" id="L292">        } catch (Exception e) {</span>
+<span class="nc" id="L293">            result = e;</span>
+<span class="nc" id="L294">        }</span>
+
+<span class="nc" id="L296">        volition.set(null);</span>
+
+<span class="nc" id="L298">        return result;</span>
+    }
+
+
+//    final class DelegateHandler&lt;X&gt; implements MethodHandler {
+//
+//        private final X obj;
+//
+//        public DelegateHandler(X n) {
+//            this.obj = n;
+//        }
+//
+//        @Override public final Object invoke(Object o, Method method, Method method1, Object[] objects) throws Throwable {
+//            final X obj = this.obj;
+//            Object result = method.invoke(obj, objects);
+//            return invoked( obj, method, objects, result);
+//        }
+//    }
+
+    @Nullable
+    @Override public final Object invoke(Object obj, @NotNull Method wrapped, @NotNull Method wrapper, Object[] args) throws Throwable {
+<span class="fc" id="L319">        Object result = wrapper.invoke(obj, args);</span>
+<span class="fc" id="L320">        return invoked( obj, wrapped, args, result);</span>
+    }
+
+//    public &lt;T&gt; T build(String id, Class&lt;? extends T&gt; classs) throws Exception {
+//        return build(id, classs, null);
+//    }
+
+    /** the id will be the atom term label for the created instance */
+    @NotNull
+    public &lt;T&gt; T wrap(String id, Class&lt;? extends T&gt; classs, /* nullable */ @NotNull T instance) throws Exception {
+
+
+<span class="fc" id="L332">        ProxyFactory factory = proxyCache.getIfAbsentPut(classs, ProxyFactory::new);</span>
+<span class="fc" id="L333">        factory.setSuperclass(classs);</span>
+
+<span class="fc" id="L335">        Class clazz = factory.createClass();</span>
+
+<span class="fc" id="L337">        T wrappedInstance = (T) clazz.newInstance();</span>
+
+
+<span class="fc" id="L340">        Atom identifier = Atom.the(id);</span>
+        //instances.put(identifier, wrappedInstance);
+
+<span class="fc" id="L343">        map(identifier, wrappedInstance);</span>
+
+//        ((ProxyObject) wrappedInstance).setHandler(
+////                delegate == null ?
+////                this :
+//                new DelegateHandler&lt;&gt;(delegate)
+//        );
+<span class="fc" id="L350">        ((ProxyObject) wrappedInstance).setHandler(this);</span>
+
+
+        //add operators for public methods
+
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        for (Method m :  instance.getClass().getMethods()) {</span>
+<span class="pc bpc" id="L356" title="1 of 4 branches missed.">            if (isMethodVisible(m) &amp;&amp; Modifier.isPublic(m.getModifiers())) {</span>
+<span class="fc" id="L357">                methodOps.computeIfAbsent(m, M -&gt; {</span>
+<span class="fc" id="L358">                    MethodOperator mo = new MethodOperator(goalInvoke, M, this);</span>
+<span class="fc" id="L359">                    nar.onExec(mo);</span>
+<span class="fc" id="L360">                    return mo;</span>
+                });
+            }
+        }
+
+<span class="fc" id="L365">        onInstanceOfClass(identifier, term(classs));</span>
+
+<span class="fc" id="L367">        return wrappedInstance;</span>
+    }
+
+    public static boolean isMethodVisible(@NotNull Method m) {
+<span class="fc" id="L371">        String n = m.getName();</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        if (n.contains(&quot;_d&quot;))</span>
+<span class="fc" id="L373">            return false; //javassist wrapper method</span>
+
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        if (m.getDeclaringClass() == Object.class)</span>
+<span class="fc" id="L376">            return false;</span>
+
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        return !methodExclusions.contains(n);</span>
+    }
+
+    public void setGoalInvoke(boolean b) {
+<span class="nc" id="L382">        goalInvoke.set(b);</span>
+<span class="nc" id="L383">    }</span>
+
+
+//    @Override
+//    public Term term(Object o) {
+//        Term i = instances.get(o);
+//        if (i!=null)
+//            return i;
+//        return super.term(o);
+//    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

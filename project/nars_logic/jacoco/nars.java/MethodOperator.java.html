@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>MethodOperator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.java</a> &gt; <span class="el_source">MethodOperator.java</span></div><h1>MethodOperator.java</h1><pre class="source lang-java linenums">package nars.java;
+
+import com.github.drapostolos.typeparser.TypeParser;
+import nars.$;
+import nars.Op;
+import nars.nal.nal8.Execution;
+import nars.nal.nal8.operator.TermFunction;
+import nars.task.Task;
+import nars.term.Term;
+import nars.term.TermBuilder;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Created by me on 8/19/15.
+ */
+public class MethodOperator extends TermFunction {
+
+
+<span class="fc" id="L28">    static final TypeParser parser = TypeParser.newBuilder().build();</span>
+
+    @NotNull
+    private final Method method;
+    private final Parameter[] params;
+
+<span class="fc" id="L34">    private static final Object[] empty = new Object[0];</span>
+    private final AtomicBoolean enable;
+    private final NALObjects context;
+<span class="fc" id="L37">    boolean feedback = true;</span>
+
+<span class="fc" id="L39">    public static final Atom ERROR = Atom.the(&quot;ERR&quot;);</span>
+<span class="fc" id="L40">    @Nullable</span>
+    private volatile Task currentTask = null;
+
+    public MethodOperator(AtomicBoolean enable, @NotNull Method m, NALObjects context) {
+<span class="fc" id="L44">        super(getParentMethodName(m));</span>
+
+<span class="fc" id="L46">        this.context = context;</span>
+<span class="fc" id="L47">        method = m;</span>
+<span class="fc" id="L48">        params = method.getParameters();</span>
+<span class="fc" id="L49">        this.enable = enable;</span>
+<span class="fc" id="L50">    }</span>
+
+    private static Term getParentMethodName(@NotNull Method m) {
+<span class="fc" id="L53">        Class&lt;?&gt; sc = m.getDeclaringClass();</span>
+
+<span class="fc" id="L55">        String superClass = sc.getSimpleName();</span>
+<span class="fc" id="L56">        String methodName = m.getName();</span>
+<span class="fc" id="L57">        return $.the(superClass + '_' + methodName);</span>
+    }
+
+    @Override
+    public void execute(@NotNull Execution e) {
+<span class="fc" id="L62">        currentTask = e.task; //HACK</span>
+
+<span class="fc" id="L64">        super.execute(e);</span>
+
+<span class="fc" id="L66">        currentTask = null;</span>
+<span class="fc" id="L67">    }</span>
+
+
+    @Nullable
+    @Override
+    public Object function(@NotNull Compound o, TermBuilder ti) {
+        Term[] x;
+        try {
+<span class="fc" id="L75">            x = ((Compound) o.terms()[0]).terms(); //HACK</span>
+<span class="fc" id="L76">        } catch (Exception e) {</span>
+<span class="fc" id="L77">            return null;</span>
+<span class="fc" id="L78">        }</span>
+
+        //System.out.println(&quot;method: &quot; + method + &quot; w/ &quot; + x);
+
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (!enable.get())</span>
+<span class="nc" id="L83">            return null;</span>
+
+<span class="fc" id="L85">        int pc = method.getParameterCount();</span>
+        int requires, paramOffset;
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (Modifier.isStatic(method.getModifiers())) {</span>
+<span class="nc" id="L88">            requires = 1;</span>
+<span class="nc" id="L89">            paramOffset = 0;</span>
+        }
+        else {
+<span class="fc" id="L92">            requires = 1 + 1;</span>
+<span class="fc" id="L93">            paramOffset = 1;</span>
+        }
+
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (x.length &lt; requires)</span>
+<span class="nc" id="L97">            throw new RuntimeException(&quot;invalid argument count: needs &quot; + requires + &quot; but has &quot; + Arrays.toString(x));</span>
+
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        Object instance = paramOffset == 0 ? null : context.object(x[0]);</span>
+
+        Object[] args;
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (pc == 0) {</span>
+<span class="fc" id="L103">            args = empty;</span>
+        }
+        else {
+<span class="fc" id="L106">            args = new Object[pc];</span>
+
+
+<span class="fc" id="L109">            Term xv = x[paramOffset];</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (!xv.op(Op.PRODUCT)) {</span>
+                //throw new RuntimeException(&quot;method parameters must be a product but is &quot; + xv);
+<span class="nc" id="L112">                return null;</span>
+            }
+
+<span class="fc" id="L115">            Compound pxv = (Compound)xv;</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (pxv.size()!=pc) {</span>
+                //throw new RuntimeException(&quot;invalid # method parameters; requires &quot; + pc + &quot; but &quot; + pxv.size() + &quot; given&quot;);
+<span class="nc" id="L118">                return null;</span>
+            }
+
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (int i = 0; i &lt; pc; i++) {</span>
+<span class="fc" id="L122">                Object a = context.object(pxv.term(i));</span>
+<span class="fc" id="L123">                Class&lt;?&gt; pt = params[i].getType();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (!pt.isAssignableFrom(a.getClass())) {</span>
+<span class="fc" id="L125">                    a = parser.parseType(a.toString(), pt);</span>
+                }
+
+<span class="fc" id="L128">                args[i] = a;</span>
+            }
+        }
+
+        try {
+
+            //Object result = Invoker.invoke(instance, method.getName(), args); /** from Boon library */
+
+
+<span class="fc" id="L137">            Object ll = currentTask.getLogLast();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            Object result = ll instanceof NALObjects.InvocationResult ? ((NALObjects.InvocationResult) ll).value : context.invokeVolition(currentTask, method, instance, args);</span>
+
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (feedback)</span>
+<span class="fc" id="L141">                return context.term(result);</span>
+
+<span class="nc" id="L143">        } catch (IllegalArgumentException e) {</span>
+
+//            System.err.println(e + &quot;: &quot; + Arrays.toString(args) + &quot; for &quot; + method);
+//            //e.printStackTrace();
+//
+//            //create a task to never desire this
+//            nar.goal(o, Tense.Present, 0.0f, 0.9f);
+//
+//            //return ERROR atom as feedback
+//            return ERROR;
+<span class="nc" id="L153">            e.printStackTrace();</span>
+
+<span class="nc" id="L155">        } catch (Exception e) {</span>
+            //System.err.println(method + &quot; &lt;- &quot; + instance + &quot; (&quot; + instance.getClass() + &quot; =?= &quot; + method.getDeclaringClass() + &quot;\n\t&lt;&lt;&lt; &quot; + Arrays.toString(args));
+            //nar.memory.eventError.emit(e);
+<span class="nc" id="L158">            return context.term(e);</span>
+<span class="nc" id="L159">        }</span>
+
+<span class="nc" id="L161">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

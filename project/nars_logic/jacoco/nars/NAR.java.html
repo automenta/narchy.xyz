@@ -1,0 +1,1011 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>NAR.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars</a> &gt; <span class="el_source">NAR.java</span></div><h1>NAR.java</h1><pre class="source lang-java linenums">package nars;
+
+
+import com.google.common.collect.Sets;
+import com.gs.collections.impl.tuple.Tuples;
+import nars.Narsese.NarseseException;
+import nars.budget.Budget;
+import nars.concept.Concept;
+import nars.nal.Level;
+import nars.nal.Tense;
+import nars.nal.nal8.AbstractOperator;
+import nars.nal.nal8.Execution;
+import nars.nal.nal8.Operator;
+import nars.nal.nal8.PatternAnswer;
+import nars.nal.nal8.operator.TermFunction;
+import nars.task.MutableTask;
+import nars.task.Task;
+import nars.task.flow.Input;
+import nars.task.flow.TaskQueue;
+import nars.task.flow.TaskStream;
+import nars.task.in.FileInput;
+import nars.task.in.TextInput;
+import nars.term.Term;
+import nars.term.TermBuilder;
+import nars.term.TermIndex;
+import nars.term.Termed;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import nars.time.Clock;
+import nars.util.event.*;
+import net.openhft.affinity.AffinityLock;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.*;
+import java.util.stream.Stream;
+
+import static nars.Symbols.*;
+import static nars.nal.Tense.ETERNAL;
+
+
+/**
+ * Non-Axiomatic Reasoner
+ * &lt;p&gt;
+ * Instances of this represent a reasoner connected to a Memory, and set of Input and Output channels.
+ * &lt;p&gt;
+ * All state is contained within Memory.  A NAR is responsible for managing I/O channels and executing
+ * memory operations.  It executesa series sof cycles in two possible modes:
+ * * step mode - controlled by an outside system, such as during debugging or testing
+ * * thread mode - runs in a pausable closed-loop at a specific maximum framerate.
+ */
+public abstract class NAR implements Serializable, Level {
+
+
+    /**
+     * The information about the version and date of the project.
+     */
+    public static final String VERSION = &quot;Open-NARS v1.7.0&quot;;
+    /**
+     * The project web sites.
+     */
+    public static final String WEBSITE =
+            &quot; Open-NARS website:  http://code.google.com/p/open-nars/ \n&quot; +
+                    &quot;      NARS website:  http://sites.google.com/site/narswang/ \n&quot; +
+                    &quot;    Github website:  http://github.com/opennars/ \n&quot; +
+                    &quot;               IRC:  http://webchat.freenode.net/?channels=nars \n&quot;;
+
+
+<span class="fc" id="L80">    static final Logger logger = LoggerFactory.getLogger(NAR.class);</span>
+    static final ThreadPoolExecutor asyncs =
+<span class="fc" id="L82">            (ThreadPoolExecutor) Executors.newCachedThreadPool();</span>
+<span class="fc" id="L83">    static final Set&lt;String&gt; logEvents = Sets.newHashSet(</span>
+            &quot;eventTaskProcess&quot;, &quot;eventAnswer&quot;,
+            &quot;eventExecute&quot;, &quot;eventRevision&quot;, /* eventDerive */ &quot;eventError&quot;,
+            &quot;eventSpeak&quot;
+    );
+    /**
+     * The memory of the reasoner
+     * TODO dont expose as public
+     */
+    @NotNull
+    public final Memory memory;
+    /**
+     * The id/name of the reasoner
+     * TODO
+     */
+    public final Atom self;
+    /**
+     * Flag for running continuously
+     */
+<span class="fc" id="L102">    public final AtomicBoolean running = new AtomicBoolean();</span>
+    //TODO use this to store all handler registrations, and decide if transient or not
+<span class="fc" id="L104">    public final transient List&lt;Object&gt; regs = new ArrayList();</span>
+    //Executors.newFixedThreadPool(1);
+<span class="fc" id="L106">    private final transient Deque&lt;Runnable&gt; nextTasks = new ConcurrentLinkedDeque();</span>
+
+
+<span class="fc" id="L109">    public NAR(@NotNull Memory m) {</span>
+
+<span class="fc" id="L111">        memory = m;</span>
+
+<span class="fc" id="L113">        m.the(NAR.class, this);</span>
+
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (running())</span>
+<span class="nc" id="L116">            throw new RuntimeException(&quot;NAR must be stopped to change memory&quot;);</span>
+
+
+<span class="fc" id="L119">        self = Global.DEFAULT_SELF; //TODO make this parametreizable</span>
+
+
+        /** register some components in the dependency context, Container (which Memory subclasses from) */
+        //m.the(&quot;memory&quot;, m);
+<span class="fc" id="L124">        m.the(&quot;clock&quot;, m.clock);</span>
+
+
+<span class="fc" id="L127">        m.eventError.on(e -&gt; {</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (e instanceof Throwable) {</span>
+<span class="nc" id="L129">                Throwable ex = (Throwable) e;</span>
+
+                //TODO move this to a specific impl of error reaction:
+<span class="nc" id="L132">                ex.printStackTrace();</span>
+
+<span class="nc bnc" id="L134" title="All 4 branches missed.">                if (Global.DEBUG &amp;&amp; Global.EXIT_ON_EXCEPTION) {</span>
+                    //throw the exception to the next lower stack catcher, or cause program exit if none exists
+<span class="nc" id="L136">                    throw new RuntimeException(ex);</span>
+                }
+<span class="nc" id="L138">            } else {</span>
+<span class="nc" id="L139">                Memory.logger.error(e.toString());</span>
+            }
+<span class="nc" id="L141">        });</span>
+
+<span class="fc" id="L143">        m.start();</span>
+
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Reset the system with an empty memory and reset clock.  Event handlers
+     * will remain attached but enabled plugins will have been deactivated and
+     * reactivated, a signal for them to empty their state (if necessary).
+     */
+    @NotNull
+    public synchronized NAR reset() {
+<span class="fc" id="L154">        runNextTasks();</span>
+
+<span class="fc" id="L156">        nextTasks.clear();</span>
+
+<span class="fc" id="L158">        NAR.asyncs.shutdown();</span>
+
+<span class="fc" id="L160">        memory.clear();</span>
+
+<span class="fc" id="L162">        return this;</span>
+    }
+
+    @NotNull
+    public FileInput input(@NotNull File input) throws IOException {
+<span class="nc" id="L167">        FileInput fi = new FileInput(this, input);</span>
+<span class="nc" id="L168">        input((Input) fi);</span>
+<span class="nc" id="L169">        return fi;</span>
+    }
+
+    /**
+     * inputs a task, only if the parsed text is valid; returns null if invalid
+     */
+    @Nullable
+    public Task inputTask(String taskText) {
+        //try {
+<span class="fc" id="L178">        Task t = task(taskText);</span>
+<span class="fc" id="L179">        t.setCreationTime(time());</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (input(t))</span>
+<span class="fc" id="L181">            return t;</span>
+<span class="nc" id="L182">        return null;</span>
+        /*} catch (Exception e) {
+            return null;
+        }*/
+    }
+
+    /**
+     * parses and forms a Task from a string but doesnt input it
+     */
+    @Nullable
+    public Task task(String taskText) {
+<span class="fc" id="L193">        return Narsese.the().task(taskText, memory);</span>
+    }
+
+    @NotNull
+    public List&lt;Task&gt; tasks(String parse) {
+<span class="fc" id="L198">        List&lt;Task&gt; result = Global.newArrayList(1);</span>
+<span class="fc" id="L199">        Narsese.the().tasks(parse, result, memory);</span>
+<span class="fc" id="L200">        return result;</span>
+    }
+
+    @NotNull
+    public TaskQueue inputs(String parse) {
+<span class="fc" id="L205">        return input(tasks(parse));</span>
+    }
+
+    @NotNull
+    public TextInput input(String text) {
+<span class="fc" id="L210">        TextInput i = new TextInput(this, text);</span>
+        /*if (i.size() == 0) {
+            //TODO replace with real parser error
+            error(new NarseseException(&quot;Input syntax error: &quot; + text));
+        }*/
+<span class="fc" id="L215">        input((Input) i);</span>
+<span class="fc" id="L216">        return i;</span>
+    }
+
+    @NotNull
+    public &lt;T extends Termed&gt; T term(String t) throws NarseseException {
+
+<span class="fc" id="L222">        T x = (T) Narsese.the().term(t, index());</span>
+
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (x == null) {</span>
+<span class="nc" id="L225">            NAR.logger.error(&quot;Term syntax error: '{}'&quot;, t);</span>
+        } else {
+
+            //this is applied automatically when a task is entered.
+            //it's only necessary here where a term is requested
+            //TODO apply this in index on the original copy only
+//            Term xt = x.term();
+//            if (xt.isCompound()) {
+//                xt.setDuration(memory.duration());
+//            }
+        }
+<span class="fc" id="L236">        return x;</span>
+    }
+
+    /**
+     * gets a concept if it exists, or returns null if it does not
+     */
+    @Nullable
+    public Concept concept(String conceptTerm) throws NarseseException {
+<span class="fc" id="L244">        return memory.concept(term(conceptTerm));</span>
+    }
+
+    /**
+     * ask question
+     */
+    @NotNull
+    public Task ask(String termString) throws NarseseException {
+        //TODO remove '?' if it is attached at end
+        /*if (t instanceof Compound)
+            return ((T)t).normalizeDestructively();*/
+<span class="fc" id="L255">        return ask((Compound) Narsese.the().&lt;Compound&gt;term(termString));</span>
+    }
+
+    /**
+     * ask question
+     */
+    @NotNull
+    public Task ask(Compound c) {
+        //TODO remove '?' if it is attached at end
+<span class="fc" id="L264">        return ask(c, QUESTION);</span>
+    }
+
+    /**
+     * ask quest
+     */
+    @Nullable
+    public Task askShould(String questString) throws NarseseException {
+<span class="nc" id="L272">        Term c = term(questString);</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (c instanceof Compound)</span>
+<span class="nc" id="L274">            return askShould((Compound) c);</span>
+<span class="nc" id="L275">        return null;</span>
+    }
+
+    /**
+     * ask quest
+     */
+    @NotNull
+    public Task askShould(Compound quest) {
+<span class="nc" id="L283">        return ask(quest, QUEST);</span>
+    }
+
+    /**
+     * desire goal
+     */
+    @Nullable
+    public Task goal(Compound goalTerm, @NotNull Tense tense, float freq, float conf) throws NarseseException {
+<span class="fc" id="L291">        return goal(</span>
+<span class="fc" id="L292">                memory.getDefaultPriority(GOAL),</span>
+<span class="fc" id="L293">                memory.getDefaultDurability(GOAL),</span>
+<span class="fc" id="L294">                goalTerm, time(tense), freq, conf);</span>
+    }
+
+    @NotNull
+    public NAR believe(Termed term, @NotNull Tense tense, float freq, float conf) throws NarseseException {
+<span class="fc" id="L299">        believe(memory.getDefaultPriority(JUDGMENT), term, time(tense), freq, conf);</span>
+<span class="fc" id="L300">        return this;</span>
+    }
+
+    @Nullable
+    public Task believe(float priority, Termed term, long when, float freq, float conf) throws NarseseException {
+<span class="fc" id="L305">        return believe(priority, memory.getDefaultDurability(JUDGMENT), term, when, freq, conf);</span>
+    }
+
+    @NotNull
+    public NAR believe(Termed term, float freq, float conf) throws NarseseException {
+<span class="fc" id="L310">        return believe(term, Tense.Eternal, freq, conf);</span>
+    }
+
+    @NotNull
+    public NAR believe(String term, @NotNull Tense tense, float freq, float conf) throws NarseseException {
+<span class="nc" id="L315">        believe(memory.getDefaultPriority(JUDGMENT), term(term), time(tense), freq, conf);</span>
+<span class="nc" id="L316">        return this;</span>
+    }
+
+    public long time(@NotNull Tense tense) {
+<span class="fc" id="L320">        return Tense.getOccurrenceTime(tense, memory);</span>
+    }
+
+    @NotNull
+    public NAR believe(String termString, float freq, float conf) throws NarseseException {
+<span class="fc" id="L325">        return believe((Termed) term(termString), freq, conf);</span>
+    }
+
+    @NotNull
+    public NAR believe(String termString) throws NarseseException {
+<span class="fc" id="L330">        return believe((Termed) term(termString));</span>
+    }
+
+    @NotNull
+    public NAR believe(Termed term) throws NarseseException {
+<span class="fc" id="L335">        return believe(term, 1.0f, memory.getDefaultConfidence(JUDGMENT));</span>
+    }
+
+    @Nullable
+    public Task believe(float pri, float dur, Termed term, long occurrenceTime, float freq, float conf) throws NarseseException {
+<span class="fc" id="L340">        return input(pri, dur, term, JUDGMENT, occurrenceTime, freq, conf);</span>
+    }
+
+    /**
+     * TODO add parameter for Tense control. until then, default is Now
+     */
+    @Nullable
+    public Task goal(float pri, float dur, Termed goal, long occurrence, float freq, float conf) throws NarseseException {
+<span class="fc" id="L348">        return input(pri, dur, goal, GOAL, occurrence, freq, conf);</span>
+    }
+
+    @Nullable
+    public Task input(float pri, float dur, @Nullable Termed term, char punc, long occurrenceTime, float freq, float conf) {
+
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (term == null) {</span>
+<span class="nc" id="L355">            return null;</span>
+        }
+
+<span class="fc" id="L358">        Task t = new MutableTask(term, punc)</span>
+<span class="fc" id="L359">                .truth(freq, conf)</span>
+<span class="fc" id="L360">                .budget(pri, dur)</span>
+<span class="fc" id="L361">                .time(time(), occurrenceTime);</span>
+
+<span class="fc" id="L363">        input(t);</span>
+
+<span class="fc" id="L365">        return t;</span>
+    }
+
+    @NotNull
+    public &lt;T extends Compound&gt; Task ask(T term, char questionOrQuest) throws NarseseException {
+
+
+        //TODO use input method like believe uses which avoids creation of redundant Budget instance
+
+<span class="fc" id="L374">        MutableTask t = new MutableTask(term);</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (questionOrQuest == QUESTION)</span>
+<span class="fc" id="L376">            t.question();</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">        else if (questionOrQuest == QUEST)</span>
+<span class="nc" id="L378">            t.quest();</span>
+        else
+<span class="nc" id="L380">            throw new RuntimeException(&quot;invalid punctuation&quot;);</span>
+
+
+<span class="fc" id="L383">        t.time(time(), ETERNAL);</span>
+
+<span class="fc" id="L385">        input(t);</span>
+
+<span class="fc" id="L387">        return t;</span>
+
+        //ex: return new Answered(this, t);
+
+    }
+
+    /**
+     * returns a validated task if valid, null otherwise
+     */
+    @Nullable
+    public Task validInput(@NotNull Task t) {
+<span class="fc" id="L398">        Memory m = memory;</span>
+
+//        if (t == null) {
+//            throw new RuntimeException(&quot;null input&quot;);
+//        }
+
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (t.isCommand()) {</span>
+            //direct execution pathway for commands
+<span class="fc" id="L406">            int n = execute(t);</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (n == 0) {</span>
+<span class="nc" id="L408">                m.remove(t, &quot;Unknown Command&quot;);</span>
+            }
+<span class="fc" id="L410">            return null;</span>
+        }
+
+<span class="fc" id="L413">        Task tNorm = t.normalize(m);</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        if (tNorm == null) {</span>
+<span class="fc" id="L415">            m.remove(t, &quot;Garbage&quot;);</span>
+<span class="fc" id="L416">            return null;</span>
+        }
+
+<span class="fc" id="L419">        return tNorm;</span>
+
+    }
+
+    /**
+     * exposes the memory to an input, derived, or immediate task.
+     * the memory then delegates it to its controller
+     * &lt;p&gt;
+     * return true if the task was processed
+     * if the task was a command, it will return false even if executed
+     */
+    public boolean input(Task t) {
+<span class="fc bfc" id="L431" title="All 2 branches covered.">        if (null == (t = validInput(t)))</span>
+<span class="fc" id="L432">            return false;</span>
+
+<span class="fc" id="L434">        memory.eventInput.emit(t);</span>
+
+<span class="fc" id="L436">        return true;</span>
+    }
+
+    /**
+     * Entry point for all potentially executable tasks.
+     * Enters a task and determine if there is a decision to execute.
+     *
+     * @return number of invoked handlers
+     */
+    public int execute(@NotNull Task goal) {
+<span class="fc" id="L446">        Term term = goal.term();</span>
+
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        if (!goal.isEternal())</span>
+<span class="fc" id="L449">            goal.setExecuted();</span>
+
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        if (Op.isOperation(term)) {</span>
+
+<span class="fc" id="L453">            Topic&lt;Execution&gt; tt = memory.exe.get(</span>
+<span class="fc" id="L454">                    Operator.operatorName((Compound) term)</span>
+            );
+
+
+<span class="pc bpc" id="L458" title="2 of 4 branches missed.">            if (tt != null &amp;&amp; !tt.isEmpty()) {</span>
+
+                //enqueue after this frame, before next
+                //beforeNextFrame(
+<span class="fc" id="L462">                new Execution(this, goal, tt).run();</span>
+                //);
+<span class="fc" id="L464">                return 1;</span>
+            }
+
+        }
+        /*else {
+            System.err.println(&quot;Unexecutable: &quot; + goal);
+        }*/
+
+<span class="nc" id="L472">        return 0;</span>
+    }
+
+    /**
+     * register a singleton
+     */
+    public &lt;X&gt; X the(Object key, X value) {
+<span class="fc" id="L479">        return memory.the(key, value);</span>
+    }
+
+    /**
+     * returns the global concept index
+     */
+    public TermIndex index() {
+<span class="fc" id="L486">        return memory.index;</span>
+    }
+
+    @NotNull
+    public TaskQueue input(@NotNull Collection&lt;Task&gt; t) {
+<span class="fc" id="L491">        TaskQueue tq = new TaskQueue(t);</span>
+<span class="fc" id="L492">        input((Input) tq);</span>
+<span class="fc" id="L493">        return tq;</span>
+    }
+
+    @NotNull
+    public TaskQueue input(@NotNull Task[] t) {
+<span class="nc" id="L498">        TaskQueue tq = new TaskQueue(t);</span>
+<span class="nc" id="L499">        input((Input) tq);</span>
+<span class="nc" id="L500">        return tq;</span>
+    }
+
+    public On onExecTask(String operator, Consumer&lt;Execution&gt; f) {
+<span class="fc" id="L504">        return onExec(Atom.the(operator), f);</span>
+    }
+
+    public On onExecTerm(String operator, @NotNull Function&lt;Term[], Object&gt; f) {
+<span class="fc" id="L508">        return onExecTerm(Atom.the(operator), f);</span>
+    }
+
+    /**
+     * creates a TermFunction operator from a supplied function, which can be a lambda
+     */
+    public On onExecTerm(Term operator, @NotNull Function&lt;Term[], Object&gt; func) {
+<span class="fc" id="L515">        return onExec(operator, new TermFunction(operator) {</span>
+
+            @Override
+            public Object function(@NotNull Compound x, TermBuilder i) {
+<span class="fc" id="L519">                return func.apply(x.terms());</span>
+            }
+
+        });
+    }
+
+    public On onExec(@NotNull AbstractOperator r) {
+<span class="fc" id="L526">        return onExec(r.getOperatorTerm(), r);</span>
+    }
+
+    public On onExec(String op, Consumer&lt;Execution&gt; each) {
+<span class="fc" id="L530">        return onExec(Atom.the(op), each);</span>
+    }
+
+    public On onExec(Term op, Consumer&lt;Execution&gt; each) {
+<span class="fc" id="L534">        Topic&lt;Execution&gt; t = memory.exe.computeIfAbsent(op, (Term o) -&gt; new DefaultTopic&lt;Execution&gt;());</span>
+<span class="fc" id="L535">        return t.on(each);</span>
+    }
+
+    public int getCyclesPerFrame() {
+<span class="fc" id="L539">        return memory.cyclesPerFrame.intValue();</span>
+    }
+
+    public void setCyclesPerFrame(int cyclesPerFrame) {
+<span class="nc" id="L543">        memory.cyclesPerFrame.set(cyclesPerFrame);</span>
+<span class="nc" id="L544">    }</span>
+
+    /**
+     * Adds an input channel for input from an external sense / sensor.
+     * Will remain added until it closes or it is explicitly removed.
+     */
+    @NotNull
+    public Input input(@NotNull Input i) {
+<span class="fc" id="L552">        i.input(this, 1);</span>
+<span class="fc" id="L553">        return i;</span>
+    }
+
+    @NotNull
+    public EventEmitter event() {
+<span class="nc" id="L558">        return memory.event;</span>
+    }
+
+    /**
+     * Exits an iteration loop if running
+     */
+    public void stop() {
+<span class="nc bnc" id="L565" title="All 2 branches missed.">        if (!running.compareAndSet(true, false)) {</span>
+<span class="nc" id="L566">            throw new RuntimeException(&quot;wasnt running&quot;);</span>
+        }
+<span class="nc" id="L568">    }</span>
+
+    /**
+     * steps 1 frame forward. cyclesPerFrame determines how many cycles this frame consists of
+     */
+    @NotNull
+    public NAR frame() {
+<span class="fc" id="L575">        return frame(1);</span>
+    }
+
+    /**
+     * pins thread to a CPU core to improve performance while
+     * running some frames.
+     * &lt;p&gt;
+     * there is some overhead in acquiring the lock so it
+     * will not make sense to use this method unless
+     * the expected runtime for the given # of frames
+     * is sufficiently high (ie. dont use this in a loop;
+     * instead put the loop inside an AffinityLock)
+     */
+    @NotNull
+    public NAR frameBatch(int frames) {
+
+<span class="nc" id="L591">        AffinityLock al = AffinityLock.acquireLock();</span>
+        try {
+<span class="nc" id="L593">            frame(frames);</span>
+        } finally {
+<span class="nc" id="L595">            al.release();</span>
+<span class="nc" id="L596">        }</span>
+
+<span class="nc" id="L598">        return this;</span>
+    }
+
+    /**
+     * Runs multiple frames, unless already running (then it return -1).
+     *
+     * @return total time in seconds elapsed in realtime
+     */
+    @NotNull
+    public NAR frame(int frames) {
+
+
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">        if (!running.compareAndSet(false, true)) {</span>
+<span class="nc" id="L611">            throw new NAR.AlreadyRunningException();</span>
+        }
+
+<span class="fc" id="L614">        Memory memory = this.memory;</span>
+
+<span class="fc" id="L616">        Topic&lt;NAR&gt; frameStart = memory.eventFrameStart;</span>
+
+<span class="fc" id="L618">        Clock clock = memory.clock;</span>
+
+<span class="fc" id="L620">        int cpf = getCyclesPerFrame();</span>
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        for (int f = 0; f &lt; frames; f++) {</span>
+
+<span class="fc" id="L623">            frameStart.emit(this);</span>
+
+<span class="fc" id="L625">            clock.preFrame();</span>
+
+<span class="fc" id="L627">            memory.cycle(cpf);</span>
+
+<span class="fc" id="L629">            runNextTasks();</span>
+        }
+
+<span class="fc" id="L632">        running.compareAndSet(true, false);</span>
+
+
+        //TODO rewrite ResourceMeter to use event handler
+
+<span class="fc" id="L637">        return this;</span>
+    }
+
+    @NotNull
+    public NAR trace(@NotNull Appendable out, Predicate&lt;String&gt; includeKey) {
+<span class="fc" id="L642">        return trace(out, includeKey, null);</span>
+    }
+
+    /* Print all statically known events (discovered via reflection)
+    *  for this reasoner to a stream
+    * */
+    @NotNull
+    public NAR trace(@NotNull Appendable out, Predicate&lt;String&gt; includeKey, @Nullable Predicate includeValue) {
+
+
+<span class="fc" id="L652">        String[] previous = {null};</span>
+
+<span class="fc" id="L654">        Topic.all(memory, (k, v) -&gt; {</span>
+<span class="pc bpc" id="L655" title="3 of 4 branches missed.">            if (includeValue != null &amp;&amp; !includeValue.test(v))</span>
+<span class="nc" id="L656">                return;</span>
+
+            try {
+<span class="fc" id="L659">                outputEvent(out, previous[0], k, v);</span>
+<span class="nc" id="L660">            } catch (IOException e) {</span>
+<span class="nc" id="L661">                error(e);</span>
+<span class="fc" id="L662">            }</span>
+<span class="fc" id="L663">        }, includeKey);</span>
+
+<span class="fc" id="L665">        return this;</span>
+    }
+
+    @NotNull
+    public NAR trace(@NotNull Appendable out) {
+<span class="fc" id="L670">        return trace(out, k -&gt; true);</span>
+    }
+
+    @NotNull
+    public NAR log() {
+<span class="fc" id="L675">        return log(System.out);</span>
+    }
+
+    @NotNull
+    public NAR log(@NotNull Appendable out) {
+<span class="fc" id="L680">        return log(out, null);</span>
+    }
+
+    @NotNull
+    public NAR log(@NotNull Appendable out, Predicate includeValue) {
+<span class="fc" id="L685">        return trace(out, NAR.logEvents::contains, includeValue);</span>
+    }
+
+    public void outputEvent(@NotNull Appendable out, String previou, @NotNull String k, Object v) throws IOException {
+        //indent each cycle
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        if (!&quot;eventCycleStart&quot;.equals(k)) {</span>
+<span class="fc" id="L691">            out.append(&quot;  &quot;);</span>
+        }
+
+<span class="fc" id="L694">        String chan = k.toString();</span>
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">        if (!chan.equals(previou)) {</span>
+<span class="fc" id="L696">            out</span>
+                    //.append(ANSI.COLOR_CONFIG)
+<span class="fc" id="L698">                    .append(chan)</span>
+                    //.append(ANSI.COLOR_RESET )
+<span class="fc" id="L700">                    .append(&quot;: &quot;);</span>
+<span class="fc" id="L701">            previou = chan;</span>
+        } else {
+            //indent
+<span class="nc bnc" id="L704" title="All 2 branches missed.">            for (int i = 0; i &lt; chan.length() + 2; i++)</span>
+<span class="nc" id="L705">                out.append(' ');</span>
+        }
+
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">        if (v instanceof Object[])</span>
+<span class="nc" id="L709">            v = Arrays.toString((Object[]) v);</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">        else if (v instanceof Task)</span>
+<span class="fc" id="L711">            v = ((Task) v).toString(memory, true);</span>
+
+<span class="fc" id="L713">        out.append(v.toString());</span>
+
+<span class="fc" id="L715">        out.append('\n');</span>
+<span class="fc" id="L716">    }</span>
+
+    /**
+     * creates a new loop which begins paused
+     */
+    @NotNull
+    public NARLoop loop() {
+<span class="nc" id="L723">        return loop(-1);</span>
+    }
+
+    @NotNull
+    public NARLoop loop(float initialFPS) {
+<span class="nc" id="L728">        float millisecPerFrame = 1000.0f / initialFPS;</span>
+<span class="nc" id="L729">        return loop((int) millisecPerFrame);</span>
+    }
+
+    /**
+     * Runs until stopped, at a given delay period between frames (0= no delay). Main loop
+     *
+     * @param initialFramePeriodMS in milliseconds
+     */
+    @NotNull
+    NARLoop loop(int initialFramePeriodMS) {
+//        //TODO use DescriptiveStatistics to track history of frametimes to slow down (to decrease speed rate away from desired) or speed up (to reach desired framerate).  current method is too nervous, it should use a rolling average
+
+<span class="nc" id="L741">        return new NARLoop(this, initialFramePeriodMS);</span>
+    }
+
+    /**
+     * sets current maximum allowed NAL level (1..8)
+     */
+    @NotNull
+    public NAR nal(int level) {
+<span class="nc" id="L749">        memory.nal(level);</span>
+<span class="nc" id="L750">        return this;</span>
+    }
+
+    /**
+     * returns the current level
+     */
+    @Override
+    public int nal() {
+<span class="fc" id="L758">        return memory.nal();</span>
+    }
+
+    /**
+     * adds a task to the queue of task which will be executed in batch
+     * after the end of the current frame before the next frame.
+     */
+    public void beforeNextFrame(@NotNull Runnable t) {
+<span class="fc bfc" id="L766" title="All 2 branches covered.">        if (running.get()) {</span>
+            //in a frame, so schedule for after it
+<span class="fc" id="L768">            nextTasks.addLast(t);</span>
+        } else {
+            //not in a frame, can execute immediately
+<span class="fc" id="L771">            t.run();</span>
+        }
+<span class="fc" id="L773">    }</span>
+
+    /**
+     * runs all the tasks in the 'Next' queue
+     */
+    protected void runNextTasks() {
+<span class="fc" id="L779">        int originalSize = nextTasks.size();</span>
+<span class="fc bfc" id="L780" title="All 2 branches covered.">        if (originalSize == 0) return;</span>
+<span class="fc" id="L781">        nextTasks.forEach(Runnable::run);</span>
+<span class="fc" id="L782">        nextTasks.clear();</span>
+<span class="fc" id="L783">    }</span>
+
+    /**
+     * signals an error through one or more event notification systems
+     */
+    protected void error(Throwable ex) {
+<span class="nc" id="L789">        memory.eventError.emit(ex);</span>
+<span class="nc" id="L790">    }</span>
+
+    /**
+     * queues a task to (hopefully) be executed at an unknown time in the future,
+     * in its own thread in a thread pool
+     */
+    public boolean execAsync(@NotNull Runnable t) {
+<span class="nc" id="L797">        return execAsync(t, null);</span>
+    }
+
+    public boolean execAsync(@NotNull Runnable t, @Nullable Consumer&lt;RejectedExecutionException&gt; onError) {
+        try {
+<span class="nc" id="L802">            memory.eventSpeak.emit(&quot;execAsync &quot; + t);</span>
+<span class="nc" id="L803">            memory.eventSpeak.emit(&quot;pool: &quot; + NAR.asyncs.getActiveCount() + &quot; running, &quot; + NAR.asyncs.getTaskCount() + &quot; pending&quot;);</span>
+
+<span class="nc" id="L805">            NAR.asyncs.execute(t);</span>
+
+<span class="nc" id="L807">            return true;</span>
+<span class="nc" id="L808">        } catch (RejectedExecutionException e) {</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">            if (onError != null)</span>
+<span class="nc" id="L810">                onError.accept(e);</span>
+<span class="nc" id="L811">            return false;</span>
+        }
+    }
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="nc" id="L818">        return getClass().getSimpleName() + '[' + memory.toString() + ']';</span>
+    }
+
+    /**
+     * Get the current time from the clock
+     *
+     * @return The current time
+     */
+    public long time() {
+<span class="fc" id="L827">        return memory.time();</span>
+    }
+
+    public boolean running() {
+<span class="fc" id="L831">        return running.get();</span>
+    }
+
+    @NotNull
+    public NAR answer(@NotNull String question, @NotNull Consumer&lt;Task&gt; recvSolution) {
+        //question punctuation optional
+<span class="pc bpc" id="L837" title="2 of 4 branches missed.">        if (!(question.length() &gt; 0 &amp;&amp; question.charAt(question.length() - 1) == '?')) question = question + '?';</span>
+<span class="fc" id="L838">        Task qt = task(question);</span>
+<span class="fc" id="L839">        return answer(qt, recvSolution);</span>
+    }
+
+    /**
+     * inputs the question and observes answer events for a solution
+     */
+    @NotNull
+    public NAR answer(Task questionOrQuest, @NotNull Consumer&lt;Task&gt; c) {
+<span class="fc" id="L847">        new AnswerReaction(this, questionOrQuest) {</span>
+
+            @Override
+            public void onSolution(Task belief) {
+<span class="fc" id="L851">                c.accept(belief);</span>
+<span class="fc" id="L852">            }</span>
+
+        };
+<span class="fc" id="L855">        return this;</span>
+    }
+
+    @NotNull
+    public NAR input(@NotNull String... ss) {
+<span class="fc bfc" id="L860" title="All 2 branches covered.">        for (String s : ss) input(s);</span>
+<span class="fc" id="L861">        return this;</span>
+    }
+
+    @NotNull
+    public NAR inputAt(long time, String... tt) {
+<span class="fc bfc" id="L866" title="All 2 branches covered.">        LongPredicate timeCondition = t -&gt; t == time;</span>
+
+<span class="fc" id="L868">        onEachCycle(m -&gt; {</span>
+<span class="fc bfc" id="L869" title="All 2 branches covered.">            if (timeCondition.test(m.time())) {</span>
+<span class="fc" id="L870">                input(tt);</span>
+            }
+<span class="fc" id="L872">        });</span>
+<span class="fc" id="L873">        return this;</span>
+    }
+
+    @NotNull
+    public NAR forEachConceptTask(boolean includeConceptBeliefs, boolean includeConceptQuestions, boolean includeConceptGoals, boolean includeConceptQuests,
+                                  boolean includeTaskLinks, int maxPerConcept,
+                                  @NotNull Consumer&lt;Task&gt; recip) {
+<span class="fc" id="L880">        forEachConcept(c -&gt; {</span>
+<span class="nc bnc" id="L881" title="All 4 branches missed.">            if (includeConceptBeliefs &amp;&amp; c.hasBeliefs()) c.getBeliefs().top(maxPerConcept, recip);</span>
+<span class="nc bnc" id="L882" title="All 4 branches missed.">            if (includeConceptQuestions &amp;&amp; c.hasQuestions()) c.getQuestions().top(maxPerConcept, recip);</span>
+<span class="nc bnc" id="L883" title="All 4 branches missed.">            if (includeConceptGoals &amp;&amp; c.hasBeliefs()) c.getGoals().top(maxPerConcept, recip);</span>
+<span class="nc bnc" id="L884" title="All 4 branches missed.">            if (includeConceptQuests &amp;&amp; c.hasQuests()) c.getQuests().top(maxPerConcept, recip);</span>
+<span class="nc bnc" id="L885" title="All 4 branches missed.">            if (includeTaskLinks &amp;&amp; null != c.getTaskLinks())</span>
+<span class="nc" id="L886">                c.getTaskLinks().forEach(maxPerConcept, t-&gt;recip.accept(t.get()));</span>
+<span class="nc" id="L887">        });</span>
+
+<span class="fc" id="L889">        return this;</span>
+    }
+
+    @Nullable
+    public abstract NAR forEachConcept(Consumer&lt;Concept&gt; recip);
+
+    @Nullable
+    public abstract Concept conceptualize(Termed termed, Budget activation, float scale);
+
+    @NotNull
+    public NAR stopIf(@NotNull BooleanSupplier stopCondition) {
+<span class="fc" id="L900">        onEachFrame(n -&gt; {</span>
+<span class="pc bpc" id="L901" title="1 of 2 branches missed.">            if (stopCondition.getAsBoolean()) stop();</span>
+<span class="fc" id="L902">        });</span>
+<span class="fc" id="L903">        return this;</span>
+    }
+
+    @NotNull
+    public NAR onEachCycle(Consumer&lt;Memory&gt; receiver) {
+<span class="fc" id="L908">        regs.add(memory.eventCycleEnd.on(receiver));</span>
+<span class="fc" id="L909">        return this;</span>
+    }
+
+    @NotNull
+    public NAR onEachFrame(Consumer&lt;NAR&gt; receiver) {
+<span class="fc" id="L914">        regs.add(memory.eventFrameStart.on(receiver));</span>
+<span class="fc" id="L915">        return this;</span>
+    }
+
+
+    @NotNull
+    public NAR trace() {
+
+<span class="fc" id="L922">        trace(System.out);</span>
+
+<span class="fc" id="L924">        return this;</span>
+    }
+
+    public void input(@NotNull Stream&lt;Task&gt; taskStream) {
+<span class="fc" id="L928">        input(new TaskStream(taskStream));</span>
+<span class="fc" id="L929">    }</span>
+
+    /**
+     * execute a Task as a TaskProcess (synchronous)
+     *
+     * TODO make private
+     */
+    @Nullable
+    public final Concept process(@NotNull Task task) {
+
+<span class="fc" id="L939">        Termed term = task.concept();</span>
+
+<span class="fc" id="L941">        Concept c = conceptualize(term, task.getBudget(), 1f);</span>
+<span class="pc bpc" id="L942" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L943">            throw new RuntimeException(&quot;Inconceivable: &quot; + task);</span>
+        }
+
+<span class="fc" id="L946">        memory.emotion.busy(task);</span>
+
+<span class="fc" id="L948">        task = c.process(task, this);</span>
+<span class="pc bpc" id="L949" title="1 of 2 branches missed.">        if (task!=null) {</span>
+
+            //propagate activation
+<span class="fc" id="L952">            c.link(task, 1f, this);</span>
+
+<span class="fc" id="L954">            memory.eventTaskProcess.emit(task);</span>
+        }
+
+<span class="fc" id="L957">        return c;</span>
+    }
+
+    /**
+     * convenience method shortcut for concept(t.getTerm())
+     * when possible, try to provide an existing Concept instance
+     * to avoid a lookup
+     */
+    @Nullable
+    public Concept concept(Termed termed) {
+<span class="fc" id="L967">        return memory.concept(termed);</span>
+    }
+
+    public On onQuestion(@NotNull PatternAnswer p) {
+<span class="fc" id="L971">        return memory.eventTaskProcess.on(question -&gt; {</span>
+<span class="pc bpc" id="L972" title="1 of 2 branches missed.">            if (question.getPunctuation() == '?') {</span>
+<span class="fc" id="L973">                beforeNextFrame(() -&gt; {</span>
+<span class="fc" id="L974">                    List&lt;Task&gt; l = p.apply(question);</span>
+<span class="pc bpc" id="L975" title="1 of 2 branches missed.">                    if (l != null) {</span>
+<span class="nc" id="L976">                        l.forEach(answer -&gt; memory.eventAnswer.emit(Tuples.twin(question, answer)));</span>
+<span class="nc" id="L977">                        input(l);</span>
+                    }
+<span class="fc" id="L979">                });</span>
+            }
+<span class="fc" id="L981">        });</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        //TODO compare any other stateful values from NAR class in addition to Memory
+<span class="nc bnc" id="L987" title="All 2 branches missed.">        return this == obj;</span>
+    }
+
+    /**
+     * gets a measure of the current priority of the concept
+     */
+    abstract public float conceptPriority(Termed termed, float priIfNonExistent);
+
+    public static class AlreadyRunningException extends RuntimeException {
+        public AlreadyRunningException() {
+<span class="nc" id="L997">            super(&quot;already running&quot;);</span>
+<span class="nc" id="L998">        }</span>
+    }
+
+//    private abstract class StreamNARReaction extends NARReaction {
+//
+//        public StreamNARReaction(Class... signal) {
+//            super(NAR.this, signal);
+//        }
+//
+//    }
+//
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

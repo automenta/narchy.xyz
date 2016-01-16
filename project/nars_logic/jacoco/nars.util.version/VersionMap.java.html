@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>VersionMap.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.version</a> &gt; <span class="el_source">VersionMap.java</span></div><h1>VersionMap.java</h1><pre class="source lang-java linenums">package nars.util.version;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jgrapht.util.ArrayUnenforcedSet;
+
+import java.util.AbstractMap;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+
+
+public class VersionMap&lt;X,Y&gt; extends AbstractMap&lt;X, Y&gt;  {
+
+    private final Versioning context;
+    public final Map&lt;X, Versioned&lt;Y&gt;&gt; map;
+
+    public VersionMap(Versioning context) {
+<span class="fc" id="L20">        this(context,</span>
+            //new LinkedHashMap&lt;&gt;()
+            //Global.newHashMap(16)
+            new HashMap(16)
+        );
+<span class="fc" id="L25">    }</span>
+
+<span class="fc" id="L27">    public VersionMap(Versioning context, Map&lt;X, Versioned&lt;Y&gt;/*&lt;Y&gt;*/&gt; map) {</span>
+<span class="fc" id="L28">        this.context = context;</span>
+<span class="fc" id="L29">        this.map = map;</span>
+<span class="fc" id="L30">    }</span>
+
+    @Override
+    public final boolean containsKey(Object key) {
+<span class="nc" id="L34">        return map.containsKey(key);</span>
+    }
+
+    @NotNull
+    @Override
+    public Set&lt;X&gt; keySet() {
+<span class="nc" id="L40">        return map.keySet();</span>
+    }
+
+    //    @Override
+//    public final void forEach(BiConsumer&lt;? super X, ? super Y&gt; action) {
+//        map.forEach((BiConsumer&lt;? super X, ? super Versioned&lt;Y&gt;&gt;) action);
+//    }
+
+    @Nullable
+    @Override
+    public Y remove(Object key) {
+<span class="fc" id="L51">        Versioned&lt;Y&gt; x = map.remove(key);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (x == null)</span>
+<span class="nc" id="L53">            return null;</span>
+
+<span class="fc" id="L55">        Y value = x.get();</span>
+<span class="fc" id="L56">        x.delete();</span>
+<span class="fc" id="L57">        return value;</span>
+    }
+
+    @Override
+    public boolean remove(Object key, Object value) {
+<span class="nc" id="L62">        throw new RuntimeException(&quot;unimpl yet&quot;);</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="nc" id="L67">        throw new RuntimeException(&quot;unimpl yet&quot;);</span>
+    }
+
+    @Override
+    public final int size() {
+<span class="fc" id="L72">        return map.size();</span>
+    }
+
+    @Override
+    public boolean isEmpty() {
+<span class="fc" id="L77">        return map.isEmpty();</span>
+    }
+
+//    @Override
+//    public final void putAll(Map&lt;? extends X, ? extends Y&gt; m) {
+//        m.forEach(this::put);
+//    }
+
+    /** avoid using this if possible because it involves transforming the entries from the internal map to the external form */
+    @NotNull
+    @Override public Set&lt;Entry&lt;X, Y&gt;&gt; entrySet() {
+<span class="fc" id="L88">        ArrayUnenforcedSet&lt;Entry&lt;X,Y&gt;&gt; e = new ArrayUnenforcedSet&lt;&gt;(size());</span>
+<span class="fc" id="L89">        map.forEach( (k, v) -&gt; {</span>
+<span class="fc" id="L90">            Y vv = v.get();</span>
+<span class="fc" id="L91">            e.add(new AbstractMap.SimpleEntry&lt;&gt;(k, vv));</span>
+<span class="fc" id="L92">        });</span>
+<span class="fc" id="L93">        return e;</span>
+    }
+
+    @Override
+    public void putAll(Map&lt;? extends X, ? extends Y&gt; m) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (m instanceof VersionMap) {</span>
+<span class="nc" id="L99">            VersionMap&lt;X,Y&gt; o = (VersionMap)m;</span>
+<span class="nc" id="L100">            o.map.forEach((k,v) -&gt; put(k, v.get()));</span>
+<span class="nc" id="L101">        }</span>
+        else {
+            //default
+<span class="nc" id="L104">            super.putAll(m);</span>
+        }
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * records an assignment operation
+     * follows semantics of set()
+     */
+    @Override
+    public final Y put(X key, Y value) {
+<span class="fc" id="L114">        getOrCreateIfAbsent(key).set(value);</span>
+<span class="fc" id="L115">        return null;</span>
+    }
+
+//    public void compute(X key, Y value, Predicate&lt;Y&gt; allow) {
+//
+//        map.compute(key, (k, v) -&gt; {
+//            if (v == null)
+//                v = newEntry(k);
+//            Y exists = v.get();
+//            if (exists!=null &amp;&amp; exists.equals(value)) {
+//                //if the value hasnt changed,
+//                // only set it if the test allows
+//                return v;
+//            }
+//            if (allow.test(value))
+//                v.set(value);
+//            else
+//                v.set(null);
+//
+//            return v;
+//        });
+//
+//    }
+
+    /** follows semantics of thenSet() */
+    public Versioning thenPut(X key, Y value) {
+<span class="nc" id="L141">        getOrCreateIfAbsent(key).thenSet(value);</span>
+<span class="nc" id="L142">        return context;</span>
+    }
+
+    public final Versioned getOrCreateIfAbsent(X key) {
+<span class="fc" id="L146">        return map.computeIfAbsent(key, this::newEntry);</span>
+    }
+
+    @NotNull
+    public Versioned&lt;Y&gt; newEntry(X k) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        return cache(k) ? new Versioned(context) :</span>
+<span class="fc" id="L152">            new RemovingVersionedEntry(k);</span>
+    }
+
+    /** this implementation removes itself from the map when it is reverted to
+     *  times prior to its appearance in the map */
+    final class RemovingVersionedEntry extends Versioned&lt;Y&gt; {
+
+        private final X key;
+
+<span class="fc" id="L161">        public RemovingVersionedEntry(X key) {</span>
+<span class="fc" id="L162">            super(context);</span>
+<span class="fc" id="L163">            this.key = key;</span>
+<span class="fc" id="L164">        }</span>
+
+        @Override
+        boolean revertNext(int before) {
+<span class="fc" id="L168">            boolean v = super.revertNext(before);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (size == 0)</span>
+<span class="fc" id="L170">                removeFromMap();</span>
+<span class="fc" id="L171">            return v;</span>
+        }
+
+        @Override
+        public void clear() {
+//            super.clear();
+//            removeFromMap();
+<span class="nc" id="L178">            throw new RuntimeException(&quot;what is this supposed to do&quot;);</span>
+        }
+
+        private void removeFromMap() {
+<span class="fc" id="L182">            VersionMap.this.remove(key);</span>
+<span class="fc" id="L183">        }</span>
+    }
+
+    public boolean cache(X key) {
+<span class="fc" id="L187">        return false;</span>
+    }
+
+    @Override
+    public final Y get(/*X*/Object key) {
+<span class="fc" id="L192">        Versioned&lt;Y&gt; v = version((X) key);</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (v!=null) return v.get();</span>
+<span class="fc" id="L194">        return null;</span>
+    }
+
+    @Nullable
+    public Y get(X key, @NotNull Supplier&lt;Y&gt; ifAbsentPut) {
+        //TODO use compute... Map methods
+<span class="nc" id="L200">        Y o = get(key);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L202">            o = ifAbsentPut.get();</span>
+<span class="nc" id="L203">            put(key, o);</span>
+        }
+<span class="nc" id="L205">        return o;</span>
+    }
+
+    public final Versioned&lt;Y&gt; version(X key) {
+<span class="fc" id="L209">        return map.computeIfPresent(key, (k, v) -&gt; {</span>
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">            if (v == null || v.isEmpty())</span>
+<span class="nc" id="L211">                return null;</span>
+<span class="fc" id="L212">            return v;</span>
+        });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

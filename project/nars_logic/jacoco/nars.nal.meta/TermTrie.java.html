@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TermTrie.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.meta</a> &gt; <span class="el_source">TermTrie.java</span></div><h1>TermTrie.java</h1><pre class="source lang-java linenums">package nars.nal.meta;
+
+import com.google.common.base.Joiner;
+import com.gs.collections.impl.map.mutable.primitive.ObjectIntHashMap;
+import nars.term.Term;
+import org.jetbrains.annotations.NotNull;
+import org.magnos.trie.Trie;
+import org.magnos.trie.TrieNode;
+import org.magnos.trie.TrieSequencer;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.util.List;
+
+import static com.sun.org.apache.xerces.internal.impl.xs.opti.SchemaDOM.indent;
+
+
+/** indexes sequences of (a perfectly-hashable fixed number
+ * of unique) terms in a magnos trie */
+abstract public class TermTrie&lt;K extends Term, V&gt; {
+
+    @NotNull
+    public final Trie&lt;List&lt;K&gt;, V&gt; trie;
+
+    public void printSummary() {
+<span class="fc" id="L26">        printSummary(System.out);</span>
+<span class="fc" id="L27">    }</span>
+
+    public void printSummary(@NotNull PrintStream out) {
+<span class="fc" id="L30">        printSummary(trie.root, out);</span>
+<span class="fc" id="L31">    }</span>
+
+
+    public TermTrie(@NotNull Iterable&lt;V&gt; R) {
+<span class="fc" id="L35">        super();</span>
+
+<span class="fc" id="L37">        ObjectIntHashMap&lt;Term&gt; conds = new ObjectIntHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L39">        trie = new Trie(new TrieSequencer&lt;List&lt;K&gt;&gt;() {</span>
+
+            @Override
+            public int matches(@NotNull List&lt;K&gt; sequenceA, int indexA, @NotNull List&lt;K&gt; sequenceB, int indexB, int count) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L44">                    K a = sequenceA.get(i + indexA);</span>
+<span class="fc" id="L45">                    K b = sequenceB.get(i + indexB);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                    if (!a.equals(b))</span>
+<span class="fc" id="L47">                        return i;</span>
+                }
+
+<span class="fc" id="L50">                return count;</span>
+            }
+
+            @Override
+            public int lengthOf(@NotNull List&lt;K&gt; sequence) {
+<span class="fc" id="L55">                return sequence.size();</span>
+            }
+
+            @Override
+            public int hashOf(@NotNull List&lt;K&gt; sequence, int index) {
+                //return sequence.get(index).hashCode();
+
+<span class="fc" id="L62">                Term pp = sequence.get(index);</span>
+<span class="fc" id="L63">                return conds.getIfAbsentPutWithKey(pp, (p) -&gt; 1 + conds.size());</span>
+            }
+        });
+
+<span class="fc" id="L67">        R.forEach(this::index);</span>
+<span class="fc" id="L68">    }</span>
+
+    /** called for each item on insert */
+    abstract public void index(V v);
+
+    public static &lt;A, B&gt; void printSummary(@NotNull TrieNode&lt;List&lt;A&gt;,B&gt; node, @NotNull PrintStream out) {
+
+<span class="fc" id="L75">        node.forEach(n -&gt; {</span>
+<span class="fc" id="L76">            List&lt;A&gt; seq = n.getSequence();</span>
+
+<span class="fc" id="L78">            int from = n.getStart();</span>
+<span class="fc" id="L79">            int to = n.getEnd();</span>
+
+
+<span class="fc" id="L82">            out.print(n.getChildCount() + &quot;|&quot; + n.getSize() + &quot;  &quot;);</span>
+
+<span class="fc" id="L84">            indent(from * 2);</span>
+
+<span class="fc" id="L86">            out.println(Joiner.on(&quot;, &quot;).join( seq.subList(from, to)));</span>
+
+<span class="fc" id="L88">            printSummary(n, out);</span>
+<span class="fc" id="L89">        });</span>
+
+<span class="fc" id="L91">    }</span>
+
+
+    public String getSummary() {
+<span class="fc" id="L95">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="fc" id="L96">        printSummary(new PrintStream(baos));</span>
+<span class="fc" id="L97">        return baos.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

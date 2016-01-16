@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>IntervalTreeBranch.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.time</a> &gt; <span class="el_source">IntervalTreeBranch.java</span></div><h1>IntervalTreeBranch.java</h1><pre class="source lang-java linenums">package nars.util.time;
+
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collection;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.function.Consumer;
+
+public class IntervalTreeBranch&lt;K extends Comparable&lt;? super K&gt;, V&gt; implements
+        IntervalTreeNode&lt;K, V&gt; {
+
+    @Nullable
+    private IntervalTreeNode&lt;K, V&gt; left, right;
+    private Between&lt;K&gt; key;
+
+<span class="fc" id="L18">    public IntervalTreeBranch(IntervalTreeNode&lt;K, V&gt; left, IntervalTreeNode&lt;K, V&gt; right) {</span>
+<span class="fc" id="L19">        this.left = left;</span>
+<span class="fc" id="L20">        this.right = right;</span>
+<span class="fc" id="L21">        updateKeyRange();</span>
+<span class="fc" id="L22">    }</span>
+
+    private void updateKeyRange() {
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (left != null) {</span>
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">            key = right == null || left.getHigh().compareTo(right.getHigh()) &gt; 0 ? new Between&lt;&gt;(left.getLow(), left.getHigh()) : new Between&lt;&gt;(left.getLow(), right.getHigh());</span>
+        } else {
+<span class="nc" id="L28">            key = new Between&lt;&gt;(right.getLow(), right.getHigh());</span>
+        }
+<span class="fc" id="L30">    }</span>
+
+    @Override
+    public boolean isLeaf() {
+<span class="nc" id="L34">        return false;</span>
+    }
+
+    @Nullable
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; getLeft() {
+<span class="nc" id="L40">        return left;</span>
+    }
+
+    @Nullable
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; getRight() {
+<span class="nc" id="L46">        return right;</span>
+    }
+
+    void setLeft(IntervalTreeNode&lt;K, V&gt; left) {
+<span class="nc" id="L50">        this.left = left;</span>
+<span class="nc" id="L51">    }</span>
+
+    void setRight(IntervalTreeNode&lt;K, V&gt; right) {
+<span class="nc" id="L54">        this.right = right;</span>
+<span class="nc" id="L55">    }</span>
+
+    @Override
+    public boolean contains(@NotNull K point) {
+<span class="nc" id="L59">        return key.contains(point);</span>
+    }
+
+    @Override
+    public boolean contains(@NotNull Between&lt;K&gt; interval) {
+<span class="fc" id="L64">        return key.contains(interval);</span>
+    }
+
+    @Override
+    public boolean overlaps(@NotNull K low, @NotNull K high) {
+<span class="nc" id="L69">        return key.overlaps(low, high);</span>
+    }
+
+    @Override
+    public boolean overlaps(@NotNull Between&lt;K&gt; interval) {
+<span class="fc" id="L74">        return key.overlaps(interval);</span>
+    }
+
+    @Override
+    public K getLow() {
+<span class="fc" id="L79">        return key.getLow();</span>
+    }
+
+    @Override
+    public K getHigh() {
+<span class="fc" id="L84">        return key.getHigh();</span>
+    }
+
+    @NotNull
+    @Override
+    public V getValue() {
+<span class="nc" id="L90">        throw new UnsupportedOperationException();</span>
+    }
+
+    @NotNull
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; put(@NotNull Between&lt;K&gt; key, V value) {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (right == null) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if (left.getLow().compareTo(key.getLow()) &lt; 0) {</span>
+<span class="nc" id="L98">                right = left;</span>
+<span class="nc" id="L99">                left = new IntervalTreeLeaf&lt;&gt;(key, value);</span>
+            } else {
+<span class="nc" id="L101">                right = new IntervalTreeLeaf&lt;&gt;(key, value);</span>
+            }
+        } else {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (right.getLow().compareTo(key.getLow()) &lt; 0) {</span>
+<span class="fc" id="L105">                right = right.put(key, value);</span>
+            } else {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                left = left == null ? new IntervalTreeLeaf&lt;&gt;(key, value) : left.put(key, value);</span>
+            }
+        }
+<span class="fc" id="L110">        updateKeyRange();</span>
+<span class="fc" id="L111">        return this;</span>
+    }
+
+    @Override
+    public void getOverlap(Between&lt;K&gt; range, Consumer&lt;V&gt; accumulator) {
+<span class="nc bnc" id="L116" title="All 4 branches missed.">        if (left != null &amp;&amp; left.overlaps(range)) {</span>
+<span class="nc" id="L117">            left.getOverlap(range, accumulator);</span>
+        }
+<span class="nc bnc" id="L119" title="All 4 branches missed.">        if (right != null &amp;&amp; right.overlaps(range)) {</span>
+<span class="nc" id="L120">            right.getOverlap(range, accumulator);</span>
+        }
+<span class="nc" id="L122">    }</span>
+
+    @Override
+    public void getOverlap(Between&lt;K&gt; range, Collection&lt;V&gt; accumulator) {
+<span class="nc bnc" id="L126" title="All 4 branches missed.">        if (left != null &amp;&amp; left.overlaps(range)) {</span>
+<span class="nc" id="L127">            left.getOverlap(range, accumulator);</span>
+        }
+<span class="nc bnc" id="L129" title="All 4 branches missed.">        if (right != null &amp;&amp; right.overlaps(range)) {</span>
+<span class="nc" id="L130">            right.getOverlap(range, accumulator);</span>
+        }
+<span class="nc" id="L132">    }</span>
+
+    @Nullable
+    @Override
+    public V getEqual(Between&lt;K&gt; range) {
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        if (left != null &amp;&amp; left.overlaps(range)) {</span>
+<span class="nc" id="L138">            return left.getEqual(range);</span>
+        }
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        if (right != null &amp;&amp; right.overlaps(range)) {</span>
+<span class="nc" id="L141">            return right.getEqual(range);</span>
+        }
+<span class="nc" id="L143">        return null;</span>
+    }
+
+    @Nullable
+    @Override
+    public V getContain(Between&lt;K&gt; range) {
+<span class="nc bnc" id="L149" title="All 4 branches missed.">        if (left != null &amp;&amp; left.overlaps(range)) {</span>
+<span class="nc" id="L150">            return left.getContain(range);</span>
+        }
+<span class="nc bnc" id="L152" title="All 4 branches missed.">        if (right != null &amp;&amp; right.overlaps(range)) {</span>
+<span class="nc" id="L153">            return right.getContain(range);</span>
+        }
+<span class="nc" id="L155">        return null;</span>
+    }
+
+    @Override
+    public void getContain(Between&lt;K&gt; range, Collection&lt;V&gt; accumulator) {
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if (left != null &amp;&amp; left.contains(range)) {</span>
+<span class="fc" id="L161">            left.getContain(range, accumulator);</span>
+        }
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (right != null &amp;&amp; right.contains(range)) {</span>
+<span class="nc" id="L164">            right.getContain(range, accumulator);</span>
+        }
+<span class="fc" id="L166">    }</span>
+
+    @Override
+    public int size() {
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        return 1 + (left != null ? left.size() : 0) + (right != null ? right.size() : 0);</span>
+    }
+
+    @Override
+    public void values(Collection&lt;V&gt; accumulator) {
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (left != null) {</span>
+<span class="fc" id="L176">            left.values(accumulator);</span>
+        }
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (right != null) {</span>
+<span class="fc" id="L179">            right.values(accumulator);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    @Nullable
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; remove(V value) {
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (left != null) {</span>
+<span class="fc" id="L187">            left = left.remove(value);</span>
+        }
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (right != null) {</span>
+<span class="fc" id="L190">            right = right.remove(value);</span>
+        }
+<span class="fc" id="L192">        return removeCleanup();</span>
+    }
+
+    private IntervalTreeNode&lt;K, V&gt; removeCleanup() {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (left == null) {</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            return right == null ? null : right;</span>
+        }
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (right == null) {</span>
+<span class="nc" id="L200">            return left;</span>
+        }
+<span class="fc" id="L202">        updateKeyRange();</span>
+<span class="fc" id="L203">        return this;</span>
+    }
+
+    @Override
+    public void entrySet(Set&lt;Entry&lt;Between&lt;K&gt;, V&gt;&gt; accumulator) {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (left != null) {</span>
+<span class="nc" id="L209">            left.entrySet(accumulator);</span>
+        }
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (right != null) {</span>
+<span class="nc" id="L212">            right.entrySet(accumulator);</span>
+        }
+<span class="nc" id="L214">    }</span>
+
+    @Override
+    public boolean containsValue(V value) {
+<span class="pc bpc" id="L218" title="2 of 8 branches missed.">        return (left != null &amp;&amp; left.containsValue(value)) || (right != null &amp;&amp; right.containsValue(value));</span>
+    }
+
+    @Override
+    public void keySet(Set&lt;Between&lt;K&gt;&gt; accumulator) {
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (left != null) {</span>
+<span class="nc" id="L224">            left.keySet(accumulator);</span>
+        }
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (right != null) {</span>
+<span class="nc" id="L227">            right.keySet(accumulator);</span>
+        }
+<span class="nc" id="L229">    }</span>
+
+    @Override
+    public boolean containedBy(@NotNull Between&lt;K&gt; interval) {
+<span class="nc" id="L233">        return interval.contains(key);</span>
+    }
+
+    @Override
+    public void searchContainedBy(Between&lt;K&gt; range, Collection&lt;V&gt; accumulator) {
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">        if (left != null &amp;&amp; left.overlaps(range)) {</span>
+<span class="fc" id="L239">            left.searchContainedBy(range, accumulator);</span>
+        }
+<span class="pc bpc" id="L241" title="1 of 4 branches missed.">        if (right != null &amp;&amp; right.overlaps(range)) {</span>
+<span class="fc" id="L242">            right.searchContainedBy(range, accumulator);</span>
+        }
+<span class="fc" id="L244">    }</span>
+
+    @Override
+    public final Between&lt;K&gt; getRange() {
+<span class="nc" id="L248">        return key;</span>
+    }
+
+    @Override
+    public int maxHeight() {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (left != null) {</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            return right != null ? Math.max(left.maxHeight(), right.maxHeight()) + 1 : left.maxHeight() + 1;</span>
+        } else {
+<span class="nc" id="L256">            return right.maxHeight() + 1;</span>
+        }
+    }
+
+    @Override
+    public void averageHeight(Collection&lt;Integer&gt; heights, int currentHeight) {
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        if (left != null) {</span>
+<span class="nc" id="L263">            left.averageHeight(heights, currentHeight + 1);</span>
+        }
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (right != null) {</span>
+<span class="nc" id="L266">            right.averageHeight(heights, currentHeight + 1);</span>
+        }
+<span class="nc" id="L268">    }</span>
+
+    @Nullable
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; removeAll(Collection&lt;V&gt; values) {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (left != null) {</span>
+<span class="nc" id="L274">            left = left.removeAll(values);</span>
+        }
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (right != null) {</span>
+<span class="nc" id="L277">            right = right.removeAll(values);</span>
+        }
+<span class="nc bnc" id="L279" title="All 4 branches missed.">        if (left == null &amp;&amp; right == null) {</span>
+<span class="nc" id="L280">            return null;</span>
+        }
+<span class="nc" id="L282">        updateKeyRange();</span>
+<span class="nc" id="L283">        return this;</span>
+    }
+
+    @Nullable
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; removeOverlapping(Between&lt;K&gt; range) {
+<span class="nc bnc" id="L289" title="All 4 branches missed.">        if (left != null &amp;&amp; left.overlaps(range)) {</span>
+<span class="nc" id="L290">            left = left.removeOverlapping(range);</span>
+        }
+<span class="nc bnc" id="L292" title="All 4 branches missed.">        if (right != null &amp;&amp; right.overlaps(range)) {</span>
+<span class="nc" id="L293">            right = right.removeOverlapping(range);</span>
+        }
+<span class="nc" id="L295">        return removeCleanup();</span>
+    }
+
+    @Nullable
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; removeContaining(Between&lt;K&gt; range) {
+<span class="nc bnc" id="L301" title="All 4 branches missed.">        if (left != null &amp;&amp; left.contains(range)) {</span>
+<span class="nc" id="L302">            left = left.removeContaining(range);</span>
+        }
+<span class="nc bnc" id="L304" title="All 4 branches missed.">        if (right != null &amp;&amp; right.contains(range)) {</span>
+<span class="nc" id="L305">            right = right.removeContaining(range);</span>
+        }
+<span class="nc" id="L307">        return removeCleanup();</span>
+    }
+
+    @Nullable
+    @Override
+    public IntervalTreeNode&lt;K, V&gt; removeContainedBy(Between&lt;K&gt; range) {
+<span class="nc bnc" id="L313" title="All 4 branches missed.">        if (left != null &amp;&amp; left.overlaps(range)) {</span>
+<span class="nc" id="L314">            left = left.removeContainedBy(range);</span>
+        }
+<span class="nc bnc" id="L316" title="All 4 branches missed.">        if (right != null &amp;&amp; right.overlaps(range)) {</span>
+<span class="nc" id="L317">            right = right.removeContainedBy(range);</span>
+        }
+<span class="nc" id="L319">        return removeCleanup();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

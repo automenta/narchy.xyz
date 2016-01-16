@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>GuavaIndex.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.index</a> &gt; <span class="el_source">GuavaIndex.java</span></div><h1>GuavaIndex.java</h1><pre class="source lang-java linenums">package nars.term.index;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import javassist.scopedpool.SoftValueHashMap;
+import nars.Op;
+import nars.term.Term;
+import nars.term.TermContainer;
+import nars.term.TermIndex;
+import nars.term.Termed;
+import nars.time.Clock;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
+/** TermIndex implemented with GuavaCache with
+ * optional WeakRef policy.
+ * suitable for running indefnitely and obeying AIKR
+ * principles
+ * */
+public class GuavaIndex implements TermIndex {
+
+    @NotNull
+    final Cache&lt;Term,Termed&gt; data;
+    @NotNull
+    final SoftValueHashMap subterms;
+
+
+    public GuavaIndex() {
+<span class="fc" id="L33">        this(CacheBuilder.newBuilder());</span>
+<span class="fc" id="L34">    }</span>
+
+    public GuavaIndex(Clock reasonerClock, int expirationCycles) {
+<span class="nc" id="L37">        this(CacheBuilder.newBuilder()</span>
+                //.maximumSize(capacity)
+
+//                .expireAfterWrite(expirationCycles, TimeUnit.NANOSECONDS)
+//                .expireAfterAccess(expirationCycles, TimeUnit.NANOSECONDS)
+//                .ticker(new Ticker() {
+//                    @Override public long read() {
+//                        return reasonerClock.time();
+//                    }
+//                })
+
+                //.weakValues()
+                //.softValues()
+
+                //.recordStats()
+//                .removalListener((e) -&gt; {
+//                    if (e.getCause()!= RemovalCause.REPLACED)
+//                        System.err.println(&quot;guava remove: &quot; + e + &quot; : &quot; + e.getCause() );
+//                }));
+        );
+
+<span class="nc" id="L58">    }</span>
+
+<span class="fc" id="L60">    public GuavaIndex(@NotNull CacheBuilder cb) {</span>
+<span class="fc" id="L61">        this.data = cb.build();</span>
+<span class="fc" id="L62">        this.subterms = new SoftValueHashMap();</span>
+//        subterms = CacheBuilder.newBuilder()
+//                //.maximumSize(capacity)
+//                .softValues()
+////                .removalListener((e) -&gt; {
+////                    if (e.getCause()!= RemovalCause.REPLACED)
+////                        System.err.println(&quot;guava remove: &quot; + e + &quot; : &quot; + e.getCause() );
+////                })
+//              .build();
+<span class="fc" id="L71">    }</span>
+
+    @Override
+    public int subtermsCount() {
+<span class="fc" id="L75">        return subterms.size();</span>
+    }
+
+    @Override
+    public void forEach(@NotNull Consumer&lt;? super Termed&gt; c) {
+<span class="nc" id="L80">        data.asMap().forEach((k,v) -&gt; c.accept(k));</span>
+<span class="nc" id="L81">    }</span>
+
+    /** gets an existing item or applies the builder to produce something to return */
+    @Override
+    public &lt;K extends Term&gt; Termed&lt;K&gt; apply(@NotNull K key, @NotNull Function&lt;K, Termed&gt; builder)  {
+        try {
+<span class="nc" id="L87">            return data.get(key, () -&gt; builder.apply(key));</span>
+<span class="nc" id="L88">        } catch (ExecutionException e) {</span>
+<span class="nc" id="L89">            throw new RuntimeException(e);</span>
+        }
+    }
+
+
+
+    @Nullable
+    @Override
+    public Termed getTermIfPresent(@NotNull Termed t) {
+<span class="nc" id="L98">        return data.getIfPresent(t.term());</span>
+    }
+
+
+    @Override
+    public void clear() {
+<span class="nc" id="L104">        data.invalidateAll();</span>
+<span class="nc" id="L105">        data.cleanUp();</span>
+//        subterms.invalidateAll();
+//        subterms.cleanUp();
+<span class="nc" id="L108">    }</span>
+
+//    @Override
+//    public Object remove(Term key) {
+//        data.invalidate(key);
+//        return key; //?
+//    }
+
+    @Override
+    public void putTerm(@NotNull Termed termed) {
+<span class="nc" id="L118">        data.put(termed.term(), termed);</span>
+<span class="nc" id="L119">    }</span>
+
+    @Override
+    public int size() {
+<span class="fc" id="L123">        return (int)data.size();</span>
+    }
+
+    @NotNull
+    @Override
+    public Termed make(Op op, int relation, TermContainer subterms, int dt) {
+<span class="fc" id="L129">        return AbstractMapIndex.intern(op, relation, internSub(subterms));</span>
+    }
+
+    @NotNull
+    @Override
+    public TermContainer internSub(TermContainer s) {
+//        try {
+//            //return subterms.get(s, () -&gt; internSubterms(s.terms()));
+//        } catch (ExecutionException e) {
+//            throw new RuntimeException(e);
+//        }
+<span class="fc" id="L140">        return (TermContainer) subterms.computeIfAbsent(s,</span>
+<span class="fc" id="L141">                (ss) -&gt; unifySubterms((TermContainer) ss));</span>
+    }
+
+
+    @Override
+    public Termed the(@NotNull Term x) {
+
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (!AbstractMapIndex.isInternable(x)) {</span>
+<span class="nc" id="L149">            return x;</span>
+        }
+
+        try {
+<span class="fc" id="L153">            return data.get(x, () -&gt; makeTerm(x));</span>
+<span class="nc" id="L154">        } catch (ExecutionException e) {</span>
+<span class="nc" id="L155">            throw new RuntimeException(e);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

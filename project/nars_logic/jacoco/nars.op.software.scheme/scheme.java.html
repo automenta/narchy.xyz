@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>scheme.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.op.software.scheme</a> &gt; <span class="el_source">scheme.java</span></div><h1>scheme.java</h1><pre class="source lang-java linenums">package nars.op.software.scheme;
+
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import nars.$;
+import nars.nal.nal8.operator.TermFunction;
+import nars.op.software.scheme.cons.Cons;
+import nars.op.software.scheme.expressions.*;
+import nars.term.Term;
+import nars.term.TermBuilder;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+import static nars.op.software.scheme.DefaultEnvironment.load;
+
+
+<span class="fc" id="L23">public class scheme extends TermFunction {</span>
+
+<span class="fc" id="L25">    @Deprecated public static final SchemeClosure env = DefaultEnvironment.newInstance();</span>
+
+
+
+    /** adapter class for NARS term -&gt; Scheme expression; temporary until the two API are merged better */
+    public static class SchemeProduct extends ListExpression {
+
+
+        public SchemeProduct(@NotNull Iterable&lt;Term&gt; p) {
+<span class="fc" id="L34">            super((Cons&lt;Expression&gt;)Cons.copyOf( Iterables.transform(p, (Term term) -&gt; {</span>
+
+<span class="fc bfc" id="L36" title="All 2 branches covered.">                if (term instanceof Iterable) {</span>
+                    //return ListExpression.list(SymbolExpression.symbol(&quot;quote&quot;), new SchemeProduct((Product)term));
+<span class="fc" id="L38">                     return new SchemeProduct((Iterable) term);</span>
+                }
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                if (term instanceof Atom) {</span>
+
+<span class="fc" id="L42">                    String s = ((Atom)term).toStringUnquoted();</span>
+
+                    //attempt to parse as number
+                    try {
+<span class="fc" id="L46">                        double d = Double.parseDouble(s);</span>
+<span class="fc" id="L47">                        return new NumberExpression((long)d);</span>
+                    }
+<span class="fc" id="L49">                    catch (NumberFormatException e) { }</span>
+
+                    //atomic symbol
+<span class="fc" id="L52">                    return new SymbolExpression(s);</span>
+                }
+<span class="nc" id="L54">                throw new RuntimeException(&quot;Invalid term for scheme: &quot; + term);</span>
+
+
+            }
+
+            )));
+<span class="fc" id="L60">        }</span>
+    }
+
+    //TODO make narsToScheme method
+
+<span class="fc" id="L65">    public static final Function&lt;Expression, Term&gt; schemeToNars = new Function&lt;Expression, Term&gt;() {</span>
+        @NotNull
+        @Override
+        public Term apply(Expression schemeObj) {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (schemeObj instanceof ListExpression) {</span>
+<span class="fc" id="L70">                return apply( ((ListExpression)schemeObj).value );</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            } else if (schemeObj instanceof SymbolicProcedureExpression) {</span>
+<span class="fc" id="L72">                Cons&lt;Expression&gt; exp = ((SymbolicProcedureExpression) schemeObj).exps;</span>
+<span class="fc" id="L73">                return apply(exp);</span>
+            }
+            //TODO handle other types, like Object[] etc
+            else {
+                //return Term.get(&quot;\&quot;&quot; + schemeObj.print() + &quot;\&quot;&quot; );
+<span class="fc" id="L78">                return Atom.the(schemeObj.print());</span>
+            }
+            //throw new RuntimeException(&quot;Invalid expression for term: &quot; + schemeObj);
+
+        }
+
+        public Term apply(@NotNull Iterable&lt;Expression&gt; e) {
+<span class="fc" id="L85">            List&lt;Term&gt; elements = Lists.newArrayList(StreamSupport.stream(e.spliterator(), false).map(schemeToNars::apply).collect(Collectors.toList()));</span>
+<span class="fc" id="L86">            return $.p( elements );</span>
+        }
+    };
+
+    @Override
+    public Term function(@NotNull Compound o, TermBuilder i) {
+<span class="fc" id="L92">        Term[] x = o.terms();</span>
+<span class="fc" id="L93">        Term code = x[0];</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (code instanceof Atom) {</span>
+            //interpret as eval string
+<span class="fc" id="L97">            Atom a = (Atom)code;</span>
+
+<span class="fc" id="L99">            return schemeToNars.apply(</span>
+<span class="fc" id="L100">                Evaluator.evaluate(</span>
+<span class="fc" id="L101">                    load(a.toStringUnquoted(), env), env)</span>
+            );
+
+        }
+
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        return code instanceof Compound ?</span>
+<span class="fc" id="L107">                schemeToNars.apply(</span>
+<span class="fc" id="L108">                    Evaluator.evaluate(</span>
+                        new SchemeProduct(((Iterable) code)), env)) :
+<span class="nc" id="L110">                schemeToNars.apply(Evaluator.evaluate(new SchemeProduct($.p(x)), env));</span>
+        //Set = evaluate as a cond?
+//        else {
+//
+//        }
+
+        //return null;
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

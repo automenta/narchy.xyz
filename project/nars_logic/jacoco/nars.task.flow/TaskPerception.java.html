@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TaskPerception.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.task.flow</a> &gt; <span class="el_source">TaskPerception.java</span></div><h1>TaskPerception.java</h1><pre class="source lang-java linenums">package nars.task.flow;
+
+import nars.Memory;
+import nars.task.Task;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.function.Consumer;
+
+/**
+ * Receives tasks which are input to a memory
+ */
+public abstract class TaskPerception implements Consumer&lt;Task&gt; {
+
+    /**
+     * where to send output
+     */
+    //private final Active active = new Active();
+    @NotNull
+    private final Memory memory;
+
+<span class="fc" id="L21">    protected TaskPerception(@NotNull Memory m) {</span>
+
+<span class="fc" id="L23">        this.memory = m;</span>
+
+        //active.add(
+<span class="fc" id="L26">            m.eventInput.on(this);</span>
+
+<span class="fc" id="L28">            m.eventReset.on((M) -&gt; clear() );</span>
+        //);
+
+<span class="fc" id="L31">    }</span>
+
+    protected TaskPerception(@NotNull Memory m, Consumer&lt;Task&gt; eachFrameSupplyTo) {
+<span class="fc" id="L34">        this(m);</span>
+        //active.add(
+<span class="fc" id="L36">            m.eventFrameStart.on((M) -&gt; nextFrame(eachFrameSupplyTo));</span>
+        //);
+<span class="fc" id="L38">    }</span>
+
+    public abstract void forEach(Consumer&lt;? super Task&gt; each);
+
+    public static class TaskBufferStats implements Consumer&lt;Task&gt; {
+        public long time;
+        public long minCreationTime;
+        public long maxCreationTime;
+        public int count;
+        //TODO minBudget, maxBudget etc
+
+<span class="nc" id="L49">        public TaskBufferStats(@NotNull Memory m) {</span>
+<span class="nc" id="L50">            reset(m);</span>
+<span class="nc" id="L51">        }</span>
+
+        public void reset(@NotNull Memory m) {
+<span class="nc" id="L54">            minCreationTime = Integer.MAX_VALUE;</span>
+<span class="nc" id="L55">            maxCreationTime = Integer.MIN_VALUE;</span>
+<span class="nc" id="L56">            count = 0;</span>
+<span class="nc" id="L57">            time = m.time();</span>
+<span class="nc" id="L58">        }</span>
+
+        @Override
+        public void accept(@NotNull Task t) {
+<span class="nc" id="L62">            long c = t.getCreationTime();</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            if (c &lt; minCreationTime) minCreationTime = c;</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (c &gt; maxCreationTime) maxCreationTime = c;</span>
+<span class="nc" id="L65">            count++;</span>
+<span class="nc" id="L66">        }</span>
+
+        @NotNull
+        @Override
+        public String toString() {
+<span class="nc" id="L71">            return &quot;TaskBufferStats{&quot; +</span>
+                    &quot;time=&quot; + time +
+                    &quot;, minCreationTime=&quot; + minCreationTime +
+                    &quot;, maxCreationTime=&quot; + maxCreationTime +
+                    &quot;, count=&quot; + count +
+                    '}';
+        }
+    }
+
+    @NotNull
+    public TaskBufferStats getStatistics() {
+        //minCreationTime, maxCreationTime
+<span class="nc" id="L83">        TaskBufferStats s = new TaskBufferStats(memory);</span>
+<span class="nc" id="L84">        forEach(s);</span>
+<span class="nc" id="L85">        return s;</span>
+    }
+
+    @Override
+    public abstract void accept(Task t);
+
+    /** here the buffer should apply any updates and send some/all inputs to the Memory */
+    public abstract void nextFrame(Consumer&lt;Task&gt; receiver);
+
+    public abstract void clear();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

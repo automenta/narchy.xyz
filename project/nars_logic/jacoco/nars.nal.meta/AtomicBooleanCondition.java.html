@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>AtomicBooleanCondition.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.meta</a> &gt; <span class="el_source">AtomicBooleanCondition.java</span></div><h1>AtomicBooleanCondition.java</h1><pre class="source lang-java linenums">package nars.nal.meta;
+
+import nars.term.Term;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+
+/**
+ * each precondition is testesd for equality by its toString() method reprsenting an immutable key.
+ * so subclasses must implement a valid toString() identifier containing its components.
+ * this will only be used at startup when compiling
+ *
+ * WARNING: no preconditions should store any state so that their instances may be used by
+ * different contexts (ex: NAR's)
+ */
+public abstract class AtomicBooleanCondition&lt;C&gt; extends AbstractLiteral implements BooleanCondition&lt;C&gt; {
+
+    public AtomicBooleanCondition() {
+<span class="fc" id="L19">        super();</span>
+<span class="fc" id="L20">    }</span>
+
+    public abstract String toString();
+
+    /** add this or subconditions to expand in a rule */
+    @Override
+    public void addConditions(@NotNull List&lt;Term&gt; l) {
+        //default: just add this
+<span class="fc" id="L28">        l.add(this);</span>
+<span class="fc" id="L29">    }</span>
+
+//    @NotNull
+//    public String toJavaConditionString() {
+//        return (&quot;(/* TODO: &quot; +
+//                this +
+//                &quot; */ false)\t&quot;);
+//    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

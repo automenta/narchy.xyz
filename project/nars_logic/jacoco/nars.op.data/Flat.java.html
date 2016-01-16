@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Flat.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.op.data</a> &gt; <span class="el_source">Flat.java</span></div><h1>Flat.java</h1><pre class="source lang-java linenums">package nars.op.data;
+
+import nars.$;
+import nars.Op;
+import nars.nal.nal8.Operator;
+import nars.nal.nal8.operator.TermFunction;
+import nars.term.Term;
+import nars.term.TermBuilder;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * recursively collects the contents of set/list compound term argument's
+ * into a list, to one of several resulting term types:
+ *      product
+ *      set (TODO)
+ *      conjunction (TODO)
+ *
+ * TODO recursive version with order=breadth|depth option
+ */
+<span class="fc" id="L24">public abstract class Flat extends TermFunction {</span>
+
+    @Override
+    public Term function(@NotNull Compound op, TermBuilder i) {
+<span class="nc" id="L28">        List&lt;Term&gt; l = new ArrayList();</span>
+<span class="nc" id="L29">        collect(Operator.opArgsArray(op), l);</span>
+<span class="nc" id="L30">        return result(l);</span>
+    }
+
+    @NotNull
+    public static List&lt;Term&gt; collect(@NotNull Term[] x, @NotNull List&lt;Term&gt; l) {
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        for (Term a : x) {</span>
+<span class="nc bnc" id="L36" title="All 6 branches missed.">            if (a.op(Op.PRODUCT) || a.op().isSet() || a.isAny(Op.ConjunctivesBits)) {</span>
+<span class="nc" id="L37">                ((Compound)a).addAllTo(l);</span>
+            }
+            else
+<span class="nc" id="L40">                l.add(a);</span>
+        }
+<span class="nc" id="L42">        return l;</span>
+    }
+
+    @NotNull
+    public abstract Term result(List&lt;Term&gt; terms);
+
+<span class="fc" id="L48">    public static class flatProduct extends Flat {</span>
+
+
+        @NotNull
+        @Override
+        public Term result(@NotNull List&lt;Term&gt; terms) {
+<span class="nc" id="L54">            return $.p(terms);</span>
+        }
+
+    }
+
+    //public Flat(boolean productOrSet, boolean breadthOrDepth) {
+        //generate each of the 4 different operate names
+
+    //}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

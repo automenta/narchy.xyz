@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TermPattern.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.meta</a> &gt; <span class="el_source">TermPattern.java</span></div><h1>TermPattern.java</h1><pre class="source lang-java linenums">package nars.nal.meta;
+
+import com.google.common.collect.ListMultimap;
+import nars.Global;
+import nars.Op;
+import nars.nal.meta.op.MatchTerm;
+import nars.nal.meta.op.SubTermOp;
+import nars.nal.meta.op.SubTermStructure;
+import nars.term.Term;
+import nars.term.constraint.MatchConstraint;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Arrays;
+import java.util.List;
+
+/** represents the &quot;program&quot; that the matcher will execute */
+public class TermPattern {
+
+    @NotNull
+    public final Term[] pre;
+    @NotNull
+    public final Term[] code;
+    public final Term term;
+
+
+<span class="fc" id="L26">    public TermPattern(Term pattern, ListMultimap&lt;Term, MatchConstraint&gt; constraints) {</span>
+
+<span class="fc" id="L28">        this.term = pattern;</span>
+
+<span class="fc" id="L30">        List&lt;BooleanCondition&lt;PremiseMatch&gt;&gt; pre = Global.newArrayList();</span>
+<span class="fc" id="L31">        List&lt;BooleanCondition&lt;PremiseMatch&gt;&gt; code = Global.newArrayList();</span>
+
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (pattern instanceof TaskBeliefPair) {</span>
+<span class="fc" id="L34">            compileTaskBeliefPair((TaskBeliefPair)pattern, pre, code, constraints);</span>
+        } else {
+            //compile(pattern, code);
+        }
+
+<span class="fc" id="L39">        this.pre = pre.toArray(new BooleanCondition[pre.size()]);</span>
+<span class="fc" id="L40">        this.code = code.toArray(new BooleanCondition[code.size()]);</span>
+<span class="fc" id="L41">    }</span>
+
+    private static void compileTaskBeliefPair(@NotNull TaskBeliefPair pattern,
+                                              @NotNull List&lt;BooleanCondition&lt;PremiseMatch&gt;&gt; pre,
+                                              @NotNull List&lt;BooleanCondition&lt;PremiseMatch&gt;&gt; code,
+                                              ListMultimap&lt;Term, MatchConstraint&gt; constraints) {
+<span class="fc" id="L47">        Term x0 = pattern.term(0);</span>
+<span class="fc" id="L48">        boolean x0Pattern = x0.op(Op.VAR_PATTERN);</span>
+<span class="fc" id="L49">        Term x1 = pattern.term(1);</span>
+<span class="fc" id="L50">        boolean x1Pattern = x1.op(Op.VAR_PATTERN);</span>
+
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!x0Pattern)</span>
+<span class="fc" id="L53">            pre.add(new SubTermOp(0, x0.op()));</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (!x1Pattern)</span>
+<span class="fc" id="L55">            pre.add(new SubTermOp(1, x1.op()));</span>
+
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (!x0Pattern)</span>
+<span class="fc" id="L58">            pre.add(new SubTermStructure(Op.VAR_PATTERN, 0, x0.structure()));</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!x1Pattern)</span>
+<span class="fc" id="L60">            pre.add(new SubTermStructure(Op.VAR_PATTERN, 1, x1.structure()));</span>
+
+//        } else {
+//            if (x0.containsTermRecursively(x1)) {
+//                //pre.add(new TermContainsRecursively(x0, x1));
+//            }
+//        }
+
+<span class="fc" id="L68">        code.add(MatchTerm.get(pattern, constraints));</span>
+
+<span class="fc" id="L70">    }</span>
+
+//    private void compile(Term x, List&lt;BooleanCondition&lt;PremiseMatch&gt;&gt; code) {
+//        //??
+//    }
+
+//    private void compileRisky(Term x, List&lt;PreCondition&gt; code) {
+//
+//
+//        if (x instanceof TaskBeliefPair) {
+//
+//            compileTaskBeliefPair((TaskBeliefPair)x, code);
+//
+//        } else if (x instanceof Compound) {
+//
+//            //compileCompound((Compound)x, code);
+//            code.add(new FindSubst.TermOpEquals(x.op())); //interference with (task,belief) pair term
+//
+//            /*
+//            if (!Ellipsis.hasEllipsis((Compound)x)) {
+//                code.add(new FindSubst.TermSizeEquals(x.size()));
+//            }
+//            else {
+//                //TODO get a min bound for the term's size according to the ellipsis type
+//            }
+//            */
+//            //code.add(new FindSubst.TermStructure(type, x.structure()));
+//
+//            //code.add(new FindSubst.TermVolumeMin(x.volume()-1));
+//
+//            int numEllipsis = Ellipsis.numEllipsis((Compound)x);
+//            if (x.op().isImage()) {
+//                if (numEllipsis == 0) {
+//                    //TODO implement case for varargs
+//                    code.add(new FindSubst.ImageIndexEquals(
+//                            ((Compound) x).relation()
+//                    ));
+//                } else {
+//                    //..
+//                }
+//            }
+//
+//
+//
+//            //if (!x.isCommutative() &amp;&amp; Ellipsis.countEllipsisSubterms(x)==0) {
+//                //ACCELERATED MATCH allows folding of common prefix matches between rules
+//
+//
+//
+//                //at this point we are certain that the compound itself should match
+//                //so we proceed with comparing subterms
+//
+//                //TODO
+//                //compileCompoundSubterms((Compound)x, code);
+//            //}
+//            //else {
+//                //DEFAULT DYNAMIC MATCH (should work for anything)
+//                code.add(new FindSubst.MatchTerm(x, null));
+//            //}
+//            //code.add(new FindSubst.MatchCompound((Compound)x));
+//
+//        } else {
+//            //an atomic term, use the general entry dynamic match point 'matchTerm'
+//
+////            if ((x.op() == type) &amp;&amp; (!(x instanceof Ellipsis) /* HACK */)) {
+////                code.add(new FindSubst.MatchXVar((Variable)x));
+////            }
+////            else {
+////                //something else
+//            code.add(new FindSubst.MatchTerm(x));
+////            }
+//        }
+//
+//    }
+
+//    /** compiles a match for the subterms of an ordered, non-commutative compound */
+//    private void compileCompoundSubterms(Compound x, List&lt;PreCondition&gt; code) {
+//
+//        //TODO
+//        //1. test equality. if equal, then skip past the remaining tests
+//        //code.add(FindSubst.TermEquals);
+//
+//        code.add(FindSubst.Subterms);
+//
+//        for (int i = 0; i &lt; x.size(); i++)
+//            matchSubterm(x, i, code); //eventually this will be fully recursive and can compile not match
+//
+//        code.add(new FindSubst.ParentTerm(x)); //return to parent/child state
+//
+//    }
+
+//    private void compileTaskBeliefPair(TaskBeliefPair x, List&lt;PreCondition&gt; code) {
+//        //when derivation begins, frame's parent will be set to the TaskBeliefPair so that a Subterm code isnt necessary
+//
+//        int first, second;
+//        if (x.term(1).op() == Op.VAR_PATTERN) {
+//            //if the belief term is just a pattern,
+//            //meaning it can match anything,
+//            //then match this first because
+//            //likely something in the task term will
+//            //depend on it.
+//            first = 1;
+//            second = 0;
+//
+//        } else {
+//            first = 0;
+//            second = 1;
+//        }
+//
+//
+//        Term x0 = x.term(first);
+//        Term x1 = x.term(second);
+//
+//        //add early preconditions for compounds
+//        if (x0.op()!=Op.VAR_PATTERN) {
+//            code.add(new FindSubst.SubTermOp(first, x0.op()));
+//            code.add(new FindSubst.SubTermStructure(type, first, x0.structure()));
+//        }
+//        if (x1.op()!=Op.VAR_PATTERN) {
+//            code.add(new FindSubst.SubTermOp(second, x1.op()));
+//            code.add(new FindSubst.SubTermStructure(type, second, x1.structure()));
+//        }
+//
+////        compileSubterm(x, first, code);
+////        compileSubterm(x, second, code);
+//        compileSubterm(x, 0, code);
+//        compileSubterm(x, 1, code);
+//    }
+
+//    private void compileSubterm(Compound x, int i, List&lt;PreCondition&gt; code) {
+//        Term xi = x.term(i);
+//        code.add(new FindSubst.Subterm(i));
+//        compile(xi, code);
+//    }
+//    private void matchSubterm(Compound x, int i, List&lt;PreCondition&gt; code) {
+//        code.add(new FindSubst.Subterm(i));
+//        code.add(new FindSubst.MatchTerm(x.term(i)));
+//    }
+
+//    private void compileCompound(Compound&lt;?&gt; x, List&lt;PreCondition&gt; code) {
+//
+//        int s = x.size();
+//
+//        /** whether any subterms are matchable variables */
+//        final boolean constant = !Variable.hasPatternVariable(x);
+//        final boolean vararg = constant ? Ellipsis.hasEllipsis(x) : false;
+//
+//        if (constant) { /*(type == Op.VAR_PATTERN &amp;&amp; (*/
+//
+//            /** allow to compile the structure of the compound
+//             *  match statically, including any optimization
+//             *  possibilties that foreknowledge of the pattern
+//             *  like we have here may provide
+//             */
+//            //compileConstantCompound(x, code);
+//        } else {
+//
+//        }
+//
+//
+//        code.add(new FindSubst.TermOpEquals(x.op())); //interference with (task,belief) pair term
+//
+//        //TODO varargs with greaterEqualSize etc
+//        //code.add(new FindSubst.TermSizeEquals(c.size()));
+//
+//        //boolean permute = x.isCommutative() &amp;&amp; (s &gt; 1);
+//
+//        switch (s) {
+//            case 0:
+//                //nothing to match
+//                break;
+//
+////            case 1:
+////                code.add(new FindSubst.MatchTheSubterm(x.term(0)));
+////                break;
+//
+//            default:
+//
+//                /*if (x instanceof Image) {
+//                    code.add(new FindSubst.MatchImageIndex(((Image)x).relationIndex)); //TODO varargs with greaterEqualSize etc
+//                }*/
+//
+//                //TODO this may only be safe if no var-args
+//                //code.add(new FindSubst.TermVolumeMin(c.volume()-1));
+//
+//
+//                code.add(new FindSubst.MatchCompound(x));
+//
+//
+////                if (permute) {
+////                    code.add(new FindSubst.MatchPermute(c));
+////                }
+////                else {
+////                    compileNonCommutative(code, c);
+////                }
+//
+//            break;
+//        }
+//    }
+
+
+    /*private void compileConstantNonCommutiveCompound(Compound&lt;?&gt; x, List&lt;PreCondition&gt; code) {
+        //TODO
+    }*/
+
+
+//
+
+//    private void compileNonCommutative(List&lt;PreCondition&gt; code, Compound&lt;?&gt; c) {
+//
+//        final int s = c.size();
+//        TreeSet&lt;SubtermPosition&gt; ss = new TreeSet();
+//
+//        for (int i = 0; i &lt; s; i++) {
+//            Term x = c.term(i);
+//            ss.add(new SubtermPosition(x, i, subtermPrioritizer));
+//        }
+//
+//        code.add( FindSubst.Subterms );
+//
+//        ss.forEach(sp -&gt; { //iterate sorted
+//            Term x = sp.term;
+//            int i = sp.position;
+//
+//            compile2(x, code, i);
+//            //compile(type, x, code);
+//        });
+//
+//        code.add( FindSubst.Superterm );
+//    }
+
+//    private void compile2(Term x, List&lt;PreCondition&gt; code, int i) {
+//        //TODO this is a halfway there.
+//        //in order for this to work, parent terms need to be stored in a stack or something to return to, otherwise they get a nulll and it crashes:
+//
+////            code.add(new SelectSubterm(i));
+////            compile(x, code);
+////
+//         if (x instanceof Compound) {
+////                //compileCompound((Compound)x, code);
+////            /*}
+////            else {
+//             code.add(new FindSubst.MatchSubterm(x, i));
+//         }
+//         else {
+//             //HACK this should be able to handle atomic subterms without a stack
+//             code.add(new FindSubst.SelectSubterm(i));
+//             compile(x, code);
+//         }
+//
+//    }
+
+//    final static class SubtermPosition implements Comparable&lt;SubtermPosition&gt; {
+//
+//        public final int score;
+//        public final Term term; //the subterm
+//        public final int position; //where it is located
+//
+//        public SubtermPosition(Term term, int pos, ToIntFunction&lt;Term&gt; scorer) {
+//            this.term = term;
+//            this.position = pos;
+//            this.score = scorer.applyAsInt(term);
+//        }
+//
+//        @Override
+//        public int compareTo(SubtermPosition o) {
+//            if (this == o) return 0;
+//            int p = Integer.compare(o.score, score); //lower first
+//            if (p!=0) return p;
+//            return Integer.compare(position, o.position);
+//        }
+//
+//        @Override
+//        public String toString() {
+//            return term + &quot; x &quot; + score + &quot; (&quot; + position + ')';
+//        }
+//    }
+//    /** heuristic for ordering comparison of subterms; lower is first */
+//    private ToIntFunction&lt;Term&gt; subtermPrioritizer = (t) -&gt; {
+//
+//        if (t.op() == type) {
+//            return 0;
+//        }
+//        else if (t instanceof Compound) {
+//            if (!t.isCommutative()) {
+//                return 1 + (1 * t.volume());
+//            } else {
+//                return 1 + (2 * t.volume());
+//            }
+//        }
+//        else {
+//            return 1; //atomic
+//        }
+//    };
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="nc" id="L368">        return &quot;TermPattern{&quot; + Arrays.toString(code) + '}';</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>SeedConceptMap.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.data</a> &gt; <span class="el_source">SeedConceptMap.java</span></div><h1>SeedConceptMap.java</h1><pre class="source lang-java linenums">package nars.util.data;
+
+import nars.NAR;
+import nars.concept.Concept;
+import nars.term.Term;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Set;
+
+/** uses a predefined set of terms that will be mapped */
+public abstract class SeedConceptMap extends ConceptMap {
+
+    public final Set&lt;Term&gt; terms;
+
+    protected SeedConceptMap(@NotNull NAR nar, Set&lt;Term&gt; terms) {
+<span class="nc" id="L16">        super(nar);</span>
+<span class="nc" id="L17">        this.terms = terms;</span>
+<span class="nc" id="L18">    }</span>
+
+
+    @Override
+    public boolean contains(@NotNull Concept c) {
+<span class="nc" id="L23">        Term s = c.get();</span>
+<span class="nc" id="L24">        return terms.contains(s);</span>
+    }
+
+<span class="nc" id="L27">    public boolean contains(Term t) { return terms.contains(t); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

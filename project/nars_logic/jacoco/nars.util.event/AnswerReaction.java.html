@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>AnswerReaction.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.event</a> &gt; <span class="el_source">AnswerReaction.java</span></div><h1>AnswerReaction.java</h1><pre class="source lang-java linenums">/*
+ * Here comes the text of your license
+ * Each line should be prefixed with  * 
+ */
+package nars.util.event;
+
+import com.gs.collections.api.tuple.Twin;
+import nars.NAR;
+import nars.Narsese;
+import nars.concept.Concept;
+import nars.task.Task;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Consumer;
+
+/**
+ *
+ * @author me
+ */
+public abstract class AnswerReaction implements Consumer&lt;Twin&lt;Task&gt;&gt; {
+    
+    @Nullable
+    private final Task question;
+    @NotNull
+    private final NAR nar;
+    @Nullable
+    private volatile On reg;
+
+
+    /** reacts to all questions */
+    protected AnswerReaction(@NotNull NAR n) {
+<span class="nc" id="L33">        this(n, (Task)null);</span>
+<span class="nc" id="L34">    }</span>
+
+
+    protected AnswerReaction(@NotNull NAR n, String questionTask) throws Narsese.NarseseException {
+<span class="nc" id="L38">        this(n, n.task(questionTask));</span>
+<span class="nc" id="L39">    }</span>
+
+    /** reacts to a specific question or quest */
+<span class="fc" id="L42">    protected AnswerReaction(@NotNull NAR n, @Nullable Task question) {</span>
+
+<span class="fc" id="L44">        nar = n;</span>
+<span class="fc" id="L45">        this.question = question;</span>
+
+<span class="fc" id="L47">        reg = n.memory.eventAnswer.on(this);</span>
+
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (question!=null) {</span>
+<span class="fc" id="L50">            reportAnyExistingSolutions();</span>
+<span class="fc" id="L51">            n.input(question);</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    public void off() {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (reg!=null) {</span>
+<span class="nc" id="L57">            reg.off();</span>
+<span class="nc" id="L58">            reg = null;</span>
+        }
+<span class="nc" id="L60">    }</span>
+
+    protected boolean reportAnyExistingSolutions() {
+<span class="fc" id="L63">        Concept c = nar.concept(question.get());</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (c == null) return false;</span>
+
+<span class="fc" id="L66">        Task top = c.getBeliefs().top(nar.time());</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (top!=null) {</span>
+<span class="nc" id="L68">            onSolution(top);</span>
+            /*
+            for (Task s : c.getBeliefs())
+                onSolution(s);
+                */
+
+<span class="nc" id="L74">            return true;</span>
+        }
+<span class="fc" id="L76">        return false;</span>
+    }
+
+    @Override
+    public void accept(@NotNull Twin&lt;Task&gt; taskTwin) {
+<span class="fc" id="L81">        Task questionTask = taskTwin.getOne();</span>
+<span class="fc" id="L82">        Task belief = taskTwin.getTwo();</span>
+
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        if ((question == null) || questionTask.equals(question)) {</span>
+<span class="fc" id="L85">            onSolution(belief);</span>
+        }
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        else if (questionTask.hasParent(question)) {</span>
+<span class="nc" id="L88">            onChildSolution(questionTask, belief);</span>
+        }
+
+<span class="fc" id="L91">    }</span>
+
+
+    /** called when the question task has been solved directly */
+    public abstract void onSolution(Task belief);
+    
+    /** called when a subtask of the question has been solved */
+    public void onChildSolution(Task question, Task belief) {
+
+<span class="nc" id="L100">    }</span>
+    
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

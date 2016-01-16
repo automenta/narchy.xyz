@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TermSet.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term</a> &gt; <span class="el_source">TermSet.java</span></div><h1>TermSet.java</h1><pre class="source lang-java linenums">package nars.term;
+
+
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Collection;
+import java.util.TreeSet;
+
+public class TermSet&lt;X extends Term&gt; extends TermVector&lt;X&gt; {
+
+    @NotNull
+    public static TermSet the(Term... x) {
+<span class="fc" id="L13">        return new TermSet(Terms.toSortedSetArray(x));</span>
+    }
+
+    @NotNull
+    public static TermSet the(Collection&lt;? extends Term&gt; x) {
+<span class="fc" id="L18">        return new TermSet(toSortedSetArray(x));</span>
+    }
+
+    @NotNull
+    public static TermSet union(@NotNull TermContainer a, @NotNull TermContainer b) {
+<span class="fc" id="L23">        TreeSet&lt;Term&gt; t = new TreeSet&lt;Term&gt;();</span>
+<span class="fc" id="L24">        a.addAllTo(t);</span>
+<span class="fc" id="L25">        b.addAllTo(t);</span>
+<span class="fc" id="L26">        return TermSet.the(t);</span>
+    }
+
+//    public static TermSet newTermSetPresorted(Term... presorted) {
+//        return new TermSet(presorted);
+//    }
+
+    private TermSet(X[] x) {
+<span class="fc" id="L34">        super(x);</span>
+<span class="fc" id="L35">    }</span>
+
+    public static Term[] toSortedSetArray(Collection&lt;? extends Term&gt; c) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        TreeSet&lt;Term&gt; t = c instanceof TreeSet ? (TreeSet&lt;Term&gt;) c : new TreeSet&lt;Term&gt;(c);</span>
+<span class="fc" id="L39">        return t.toArray(new Term[t.size()]);</span>
+    }
+
+    @Override public final boolean isSorted() {
+<span class="fc" id="L43">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TrieDeriver.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.meta</a> &gt; <span class="el_source">TrieDeriver.java</span></div><h1>TrieDeriver.java</h1><pre class="source lang-java linenums">package nars.nal.meta;
+
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Lists;
+import javassist.*;
+import nars.Global;
+import nars.nal.Deriver;
+import nars.nal.meta.op.Derive;
+import nars.nal.meta.op.MatchTerm;
+import nars.term.Term;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.magnos.trie.TrieNode;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
+/**
+ * separates rules according to task/belief term type but otherwise involves significant redundancy we'll eliminate in other Deriver implementations
+ */
+public class TrieDeriver extends Deriver {
+
+    @NotNull
+    public final ProcTerm&lt;PremiseMatch&gt;[] roots;
+    @Nullable
+    public final TermTrie&lt;Term, PremiseRule&gt; trie;
+
+    /** derivation term graph, gathered for analysis */
+<span class="fc" id="L33">    public final HashMultimap&lt;MatchTerm,Derive&gt; derivationLinks = HashMultimap.create();</span>
+
+    public TrieDeriver(String... rule) {
+<span class="fc" id="L36">        this(new PremiseRuleSet(Lists.newArrayList(rule)));</span>
+<span class="fc" id="L37">    }</span>
+
+    public TrieDeriver(@NotNull PremiseRuleSet ruleset) {
+<span class="fc" id="L40">        super(ruleset);</span>
+
+<span class="fc" id="L42">        this.trie = new TermTrie&lt;Term, PremiseRule&gt;(ruleset.getPremiseRules()) {</span>
+
+            @Override
+            public void index(@Nullable PremiseRule s) {
+
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">                if (s == null || s.postconditions == null)</span>
+<span class="nc" id="L48">                    return;</span>
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                for (PostCondition p : s.postconditions) {</span>
+
+<span class="fc" id="L52">                    PremiseRule existing = trie.put(s.getConditions(p), s);</span>
+
+<span class="pc bpc" id="L54" title="5 of 6 branches missed.">                    if (existing != null &amp;&amp; s != existing &amp;&amp; existing.equals(s)) {</span>
+<span class="nc" id="L55">                        System.err.println(&quot;DUPL: &quot; + existing);</span>
+<span class="nc" id="L56">                        System.err.println(&quot;      &quot; + existing.getSource());</span>
+<span class="nc" id="L57">                        System.err.println(&quot;EXST: &quot; + s.getSource());</span>
+<span class="nc" id="L58">                        System.err.println();</span>
+                    }
+                }
+<span class="fc" id="L61">            }</span>
+        };
+
+<span class="fc" id="L64">        this.roots = getBranches(trie.trie.root).toArray(new ProcTerm[0]);</span>
+
+
+        /*
+        for (ProcTerm&lt;PremiseMatch&gt; p : roots) {
+            try {
+                compile(p);
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
+        }
+        */
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    public final void run(PremiseMatch m) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (ProcTerm&lt;PremiseMatch&gt; r : roots)</span>
+<span class="fc" id="L82">            r.accept(m);</span>
+<span class="fc" id="L83">    }</span>
+
+    /** HACK warning: use of this singular matchParent tracker is not thread-safe. assumes branches will be processed in a linear, depth first order */
+<span class="fc" id="L86">    @Nullable</span>
+    final transient AtomicReference&lt;MatchTerm&gt; matchParent = new AtomicReference&lt;MatchTerm&gt;(null);
+
+    @NotNull
+    private List&lt;Term&gt; getBranches(@NotNull TrieNode&lt;List&lt;Term&gt;, PremiseRule&gt; node) {
+
+<span class="fc" id="L92">        List&lt;Term&gt; bb = Global.newArrayList(node.getChildCount());</span>
+
+
+<span class="fc" id="L95">        node.forEach(n -&gt; {</span>
+<span class="fc" id="L96">            List&lt;Term&gt; seq = n.getSequence();</span>
+
+<span class="fc" id="L98">            int from = n.getStart();</span>
+<span class="fc" id="L99">            int to = n.getEnd();</span>
+
+
+<span class="fc" id="L102">            bb.add(branch(</span>
+<span class="fc" id="L103">                    compileConditions(seq.subList(from, to), matchParent),</span>
+<span class="fc" id="L104">                    new PremiseMatchFork(compileActions(TrieDeriver.this.getBranches(n)).toArray(new ProcTerm[0]))));</span>
+<span class="fc" id="L105">        });</span>
+
+<span class="fc" id="L107">        return bb;</span>
+    }
+
+
+    private Collection&lt;BooleanCondition&lt;PremiseMatch&gt;&gt; compileConditions(@NotNull Collection&lt;Term&gt; t, @NotNull AtomicReference&lt;MatchTerm&gt; matchParent) {
+
+<span class="fc" id="L113">        return t.stream().filter(x -&gt; {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (x instanceof BooleanCondition) {</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                if (x instanceof MatchTerm) {</span>
+<span class="fc" id="L116">                    matchParent.set((MatchTerm) x);</span>
+                }
+<span class="fc" id="L118">                return true;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            } if (x instanceof Derive) {</span>
+                //link this derivation action to the previous Match,
+                //allowing multiple derivations to fold within a Match's actions
+<span class="fc" id="L122">                MatchTerm mt = matchParent.get();</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                if (mt == null) {</span>
+<span class="nc" id="L124">                    throw new RuntimeException(&quot;detached Derive action: &quot; + x + &quot; in branch: &quot; + t);</span>
+                    //System.err.println(&quot;detached Derive action: &quot; + x + &quot; in branch: &quot; + t);
+                }
+                else {
+                    //HACK
+<span class="fc" id="L129">                    Derive dx = (Derive) x;</span>
+<span class="fc" id="L130">                    mt.derive(dx);</span>
+<span class="fc" id="L131">                    derivationLinks.put(mt, dx);</span>
+                }
+<span class="fc" id="L133">                return false;</span>
+            } else {
+<span class="nc" id="L135">                throw new RuntimeException(&quot;not boolean condition&quot; + x + &quot; in branch: &quot; + t + &quot; (&quot; + x.getClass() + ')');</span>
+                //System.out.println(&quot;\tnot boolean condition&quot;);
+                //return false;
+            }
+<span class="fc" id="L139">        }).map(x -&gt; (BooleanCondition&lt;PremiseMatch&gt;)x).collect(Collectors.toList());</span>
+    }
+
+
+
+    @NotNull
+    private static Collection&lt;ProcTerm&lt;PremiseMatch&gt;&gt; compileActions(@NotNull List&lt;Term&gt; t) {
+        //t.forEach(x -&gt; System.out.println(x.getClass() + &quot; &quot; + x));
+<span class="fc" id="L147">        return (Collection)t;</span>
+    }
+
+
+    @NotNull
+    public static ProcTerm&lt;PremiseMatch&gt; branch(
+            @NotNull Collection&lt;BooleanCondition&lt;PremiseMatch&gt;&gt; condition,
+            @Nullable ThenFork&lt;PremiseMatch&gt; conseq) {
+
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if ((conseq != null) &amp;&amp; (conseq.size() &gt; 0)) {</span>
+<span class="fc" id="L157">            return new PremiseBranch(condition, conseq);</span>
+        } else {
+<span class="fc" id="L159">            return new PremiseBranch(condition, Return.the);</span>
+        }
+    }
+
+    protected void compile(@NotNull ProcTerm&lt;PremiseMatch&gt; p) throws IOException, CannotCompileException, NotFoundException {
+<span class="nc" id="L164">        StringBuilder s = new StringBuilder();</span>
+
+<span class="nc" id="L166">        final String header = &quot;public final static String wtf=&quot; +</span>
+                '&quot;' + this + ' ' + new Date() + &quot;\&quot;+\n&quot; +
+                &quot;\&quot;COPYRIGHT (C) OPENNARS. ALL RIGHTS RESERVED.\&quot;+\n&quot; +
+                &quot;\&quot;THIS SOURCE CODE AND ITS GENERATOR IS PROTECTED BY THE AFFERO GENERAL PUBLIC LICENSE: https://gnu.org/licenses/agpl.html\&quot;+\n&quot; +
+                &quot;\&quot;http://github.com/opennars/opennars\&quot;;\n&quot;;
+
+        //System.out.print(header);
+<span class="nc" id="L173">        p.appendJavaProcedure(s);</span>
+
+
+<span class="nc" id="L176">        ClassPool pool = ClassPool.getDefault();</span>
+<span class="nc" id="L177">        pool.importPackage(&quot;nars.truth&quot;);</span>
+<span class="nc" id="L178">        pool.importPackage(&quot;nars.nal&quot;);</span>
+
+<span class="nc" id="L180">        CtClass cc = pool.makeClass(&quot;nars.nal.CompiledDeriver&quot;);</span>
+<span class="nc" id="L181">        CtClass parent = pool.get(&quot;nars.nal.Deriver&quot;);</span>
+
+<span class="nc" id="L183">        cc.addField(CtField.make(header, cc));</span>
+
+<span class="nc" id="L185">        cc.setSuperclass(parent);</span>
+
+        //cc.addConstructor(parent.getConstructors()[0]);
+
+<span class="nc" id="L189">        String initCode = &quot;nars.Premise p = m.premise;&quot;;</span>
+
+<span class="nc" id="L191">        String m = &quot;public void run(nars.nal.PremiseMatch m) {\n&quot; +</span>
+                '\t' + initCode + '\n' +
+                '\t' + s + '\n' +
+                '}';
+
+<span class="nc" id="L196">        System.out.println(m);</span>
+
+
+<span class="nc" id="L199">        cc.addMethod(CtNewMethod.make(m, cc));</span>
+<span class="nc" id="L200">        cc.writeFile(&quot;/tmp&quot;);</span>
+
+        //System.out.println(cc.toBytecode());
+<span class="nc" id="L203">        System.out.println(cc);</span>
+<span class="nc" id="L204">    }</span>
+
+
+    //final static Logger logger = LoggerFactory.getLogger(TrieDeriver.class);
+
+
+//    final static void run(RuleMatch m, List&lt;TaskRule&gt; rules, int level, Consumer&lt;Task&gt; t) {
+//
+//        final int nr = rules.size();
+//        for (int i = 0; i &lt; nr; i++) {
+//
+//            TaskRule r = rules.get(i);
+//            if (r.minNAL &gt; level) continue;
+//
+//            PostCondition[] pc = m.run(r);
+//            if (pc != null) {
+//                for (PostCondition p : pc) {
+//                    if (p.minNAL &gt; level) continue;
+//                    ArrayList&lt;Task&gt; Lx = m.apply(p);
+//                    if(Lx!=null) {
+//                        for (Task x : Lx) {
+//                            if (x != null)
+//                                t.accept(x);
+//                        }
+//                    }
+//                    /*else
+//                        System.out.println(&quot;Post exit: &quot; + r + &quot; on &quot; + m.premise);*/
+//                }
+//            }
+//        }
+//    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

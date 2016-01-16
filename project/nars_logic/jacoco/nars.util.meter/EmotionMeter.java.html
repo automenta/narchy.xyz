@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>EmotionMeter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.meter</a> &gt; <span class="el_source">EmotionMeter.java</span></div><h1>EmotionMeter.java</h1><pre class="source lang-java linenums">package nars.util.meter;
+
+import nars.Global;
+import nars.Memory;
+import nars.task.Task;
+import nars.util.event.FrameReaction;
+import nars.util.meter.event.DoubleMeter;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.Serializable;
+
+/**
+ * emotional value; self-felt internal mental states; variables used to record emotional values
+ */
+public class EmotionMeter extends FrameReaction implements Serializable {
+
+    //public static final Compound BUSYness = $.seti(Atom.the(&quot;busy&quot;));
+    @NotNull
+    private final Memory memory;
+
+
+    /**
+     * busy = total priority accumulated in this cycle
+     */
+    private float busy;
+
+    /** happy = total happiness accumulated in this cycle */
+    private float happy;
+
+    //private final float happinessFade = 0.95f;
+
+<span class="fc" id="L32">    public float lasthappy = -1;</span>
+<span class="fc" id="L33">    public float lastbusy = -1;</span>
+
+
+<span class="fc" id="L36">    public final DoubleMeter happyMeter = new DoubleMeter(&quot;happy&quot;);</span>
+<span class="fc" id="L37">    public final DoubleMeter busyMeter = new DoubleMeter(&quot;busy&quot;);</span>
+
+
+    //static final Compound satisfiedSetInt = $.seti($.the(&quot;satisfied&quot;));
+
+    public EmotionMeter(@NotNull Memory memory) {
+<span class="fc" id="L43">        super(memory);</span>
+
+<span class="fc" id="L45">        this.memory = memory;</span>
+
+<span class="fc" id="L47">        onFrame(); //first update</span>
+<span class="fc" id="L48">    }</span>
+
+
+    @Override
+    public final void onFrame() {
+<span class="fc" id="L53">        commitHappy();</span>
+
+<span class="fc" id="L55">        commitBusy();</span>
+<span class="fc" id="L56">    }</span>
+
+    public float happy() {
+<span class="nc" id="L59">        return (float)happyMeter.get();</span>
+    }
+
+    public float busy() {
+<span class="nc" id="L63">        return (float)busyMeter.get();</span>
+    }
+
+
+    public void happy(float delta) {
+<span class="fc" id="L68">        happy += delta;</span>
+<span class="fc" id="L69">    }</span>
+
+    public void happy(float solution, @NotNull Task task) {
+<span class="fc" id="L72">        happy += ( task.getBudget().summary() * solution );</span>
+<span class="fc" id="L73">    }</span>
+
+    protected void commitHappy() {
+
+
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (lasthappy != -1) {</span>
+            //float frequency = changeSignificance(lasthappy, happy, Global.HAPPY_EVENT_CHANGE_THRESHOLD);
+//            if (happy &gt; Global.HAPPY_EVENT_HIGHER_THRESHOLD &amp;&amp; lasthappy &lt;= Global.HAPPY_EVENT_HIGHER_THRESHOLD) {
+//                frequency = 1.0f;
+//            }
+//            if (happy &lt; Global.HAPPY_EVENT_LOWER_THRESHOLD &amp;&amp; lasthappy &gt;= Global.HAPPY_EVENT_LOWER_THRESHOLD) {
+//                frequency = 0.0f;
+//            }
+
+//            if ((frequency != -1) &amp;&amp; (memory.nal(7))) { //ok lets add an event now
+//
+//                Inheritance inh = Inheritance.make(memory.self(), satisfiedSetInt);
+//
+//                memory.input(
+//                        TaskSeed.make(memory, inh).judgment()
+//                                .truth(frequency, Global.DEFAULT_JUDGMENT_CONFIDENCE)
+//                                .occurrNow()
+//                                .budget(Global.DEFAULT_JUDGMENT_PRIORITY, Global.DEFAULT_JUDGMENT_DURABILITY)
+//                                .reason(&quot;Happy Metabelief&quot;)
+//                );
+//
+//                if (Global.REFLECT_META_HAPPY_GOAL) { //remind on the goal whenever happyness changes, should suffice for now
+//
+//                    //TODO convert to fluent format
+//
+//                    memory.input(
+//                            TaskSeed.make(memory, inh).goal()
+//                                    .truth(frequency, Global.DEFAULT_GOAL_CONFIDENCE)
+//                                    .occurrNow()
+//                                    .budget(Global.DEFAULT_GOAL_PRIORITY, Global.DEFAULT_GOAL_DURABILITY)
+//                                    .reason(&quot;Happy Metagoal&quot;)
+//                    );
+//
+//                    //this is a good candidate for innate belief for consider and remind:
+//
+//                    if (InternalExperience.enabled &amp;&amp; Global.CONSIDER_REMIND) {
+//                        Operation op_consider = Operation.op(Product.only(inh), consider.consider);
+//                        Operation op_remind = Operation.op(Product.only(inh), remind.remind);
+//
+//                        //order important because usually reminding something
+//                        //means it has good chance to be considered after
+//                        for (Operation o : new Operation[]{op_remind, op_consider}) {
+//
+//                            memory.input(
+//                                    TaskSeed.make(memory, o).judgment()
+//                                            .occurrNow()
+//                                            .truth(1.0f, Global.DEFAULT_JUDGMENT_CONFIDENCE)
+//                                            .budget(Global.DEFAULT_JUDGMENT_PRIORITY * InternalExperience.INTERNAL_EXPERIENCE_PRIORITY_MUL,
+//                                                    Global.DEFAULT_JUDGMENT_DURABILITY * InternalExperience.INTERNAL_EXPERIENCE_DURABILITY_MUL)
+//                                            .reason(&quot;Happy Remind/Consider&quot;)
+//                            );
+//                        }
+//                    }
+//                }
+//            }
+//        }
+        }
+
+<span class="fc" id="L136">        happyMeter.set(happy);</span>
+
+        /*if (happy &gt; 0)
+            happy *= happinessFade;*/
+<span class="fc" id="L140">    }</span>
+
+    /** @return -1 if no significant change, 0 if decreased, 1 if increased */
+    private static float changeSignificance(float prev, float current, float proportionChangeThreshold) {
+<span class="fc" id="L144">        float range = Math.max(prev, current);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (range == 0) return -1;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (prev - current &gt; range * proportionChangeThreshold)</span>
+<span class="fc" id="L147">            return -1;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (current - prev &gt; range * proportionChangeThreshold)</span>
+<span class="fc" id="L149">            return 1;</span>
+
+<span class="fc" id="L151">        return -1;</span>
+    }
+
+
+    public void busy(@NotNull Task cause) {
+<span class="fc" id="L156">        busy += cause.getPriority();</span>
+<span class="fc" id="L157">    }</span>
+
+
+    protected void commitBusy() {
+
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (lastbusy != -1) {</span>
+            //float frequency = -1;
+<span class="fc" id="L164">            float frequency = changeSignificance(lastbusy, busy, Global.BUSY_EVENT_CHANGE_THRESHOLD);</span>
+            //            if (busy &gt; Global.BUSY_EVENT_HIGHER_THRESHOLD &amp;&amp; lastbusy &lt;= Global.BUSY_EVENT_HIGHER_THRESHOLD) {
+//                frequency = 1.0f;
+//            }
+//            if (busy &lt; Global.BUSY_EVENT_LOWER_THRESHOLD &amp;&amp; lastbusy &gt;= Global.BUSY_EVENT_LOWER_THRESHOLD) {
+//                frequency = 0.0f;
+//            }
+
+
+            /*
+            if (Global.REFLECT_META_BUSY_BELIEF &amp;&amp; (frequency != -1) &amp;&amp; (memory.nal(7))) { //ok lets add an event now
+                final Inheritance busyTerm = Inheritance.make(memory.self(), BUSYness);
+
+                memory.input(
+                        TaskSeed.make(memory, busyTerm).judgment()
+                                .truth(frequency, Global.DEFAULT_JUDGMENT_CONFIDENCE)
+                                .occurrNow()
+                                .budget(Global.DEFAULT_JUDGMENT_PRIORITY, Global.DEFAULT_JUDGMENT_DURABILITY)
+                                .reason(&quot;Busy&quot;)
+                );
+            }
+            */
+        }
+
+<span class="fc" id="L188">        busyMeter.set(lastbusy = busy);</span>
+
+<span class="fc" id="L190">        busy = 0;</span>
+
+
+<span class="fc" id="L193">    }</span>
+
+    public void clear() {
+<span class="fc" id="L196">        busy = 0;</span>
+<span class="fc" id="L197">        happy = 0;</span>
+<span class="fc" id="L198">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

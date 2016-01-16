@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Versioning.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.version</a> &gt; <span class="el_source">Versioning.java</span></div><h1>Versioning.java</h1><pre class="source lang-java linenums">package nars.util.version;
+
+import nars.util.data.DequePool;
+import nars.util.data.list.FasterList;
+import org.jetbrains.annotations.NotNull;
+
+/** versioning context that holds versioned instances */
+<span class="fc" id="L8">public class Versioning extends FasterList&lt;Versioned&gt; {</span>
+
+<span class="fc" id="L10">    private int now = 0;</span>
+
+    /** serial id's assigned to each Versioned */
+<span class="fc" id="L13">    private int nextID = 1;</span>
+
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="fc" id="L19">        return now + &quot;:&quot; + super.toString();</span>
+    }
+
+    public final int now() {
+<span class="fc" id="L23">        return now;</span>
+    }
+
+    /** start a new version with a commit, returns current version  */
+    public final int newChange(Versioned v) {
+<span class="fc" id="L28">        int c = commit();</span>
+<span class="fc" id="L29">        add(v);</span>
+<span class="fc" id="L30">        return c;</span>
+    }
+
+    /** track change on current commit, returns current version */
+    public final int continueChange(Versioned v) {
+<span class="nc" id="L35">        add(v);</span>
+<span class="nc" id="L36">        return now;</span>
+    }
+
+    public final int commit() {
+<span class="fc" id="L40">        return ++now;</span>
+    }
+
+
+    /** reverts to previous state */
+    public final void revert() {
+<span class="fc" id="L46">        revert(now -1);</span>
+<span class="fc" id="L47">    }</span>
+
+    /** reverts/undo to previous state */
+    public final void revert(int when) {
+<span class="fc" id="L51">        int was = now;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (was == when)</span>
+<span class="fc" id="L53">            return; //no change</span>
+
+<span class="fc" id="L55">        doRevert(when, was);</span>
+<span class="fc" id="L56">    }</span>
+
+    public void doRevert(int when, int was) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (was &lt; when)</span>
+<span class="nc" id="L60">            throw new RuntimeException(&quot;reverting to future time&quot;);</span>
+<span class="fc" id="L61">        now = when;</span>
+
+<span class="fc" id="L63">        int s = size()-1;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (s == -1) return; //empty</span>
+
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        while (get(s).revertNext(when)) {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (--s &lt; 0)</span>
+<span class="fc" id="L68">                break;</span>
+        }
+
+<span class="fc" id="L71">        popTo(s);</span>
+<span class="fc" id="L72">    }</span>
+
+    /** assigns a new serial ID to a versioned item for its use as a hashcode */
+    public final int track() {
+<span class="fc" id="L76">        return nextID++;</span>
+    }
+
+    static final int initiALPOOL_CAPACITY = 16;
+    static final int stackLimit = 12;
+
+<span class="fc" id="L82">    final DequePool&lt;FasterList&gt; valueStackPool = new FasterListDequePool();</span>
+<span class="fc" id="L83">    final DequePool&lt;int[]&gt; intStackPool = new intDequePool();</span>
+
+    public final &lt;X&gt; FasterList&lt;X&gt; newValueStack() {
+        //from heap:
+        //return new FasterList(16);
+
+        //object pooling value stacks from context:
+<span class="fc" id="L90">        return valueStackPool.get();</span>
+    }
+
+    public final int[] newIntStack() {
+<span class="fc" id="L94">        return intStackPool.get();</span>
+    }
+
+    /** should only call this when v will never be used again because its buffers are recycled here */
+    public &lt;X&gt; void onDeleted(@NotNull Versioned v) {
+<span class="fc" id="L99">        FasterList vStack = v.value;</span>
+
+        //TODO maybe flush these periodically for GC
+        //vStack.clear();
+
+        //TODO reject arrays that have grown beyond a certain size
+<span class="fc" id="L105">        valueStackPool.put(vStack);</span>
+<span class="fc" id="L106">        intStackPool.put(v.array());</span>
+<span class="fc" id="L107">    }</span>
+
+    private static final class FasterListDequePool extends DequePool&lt;FasterList&gt; {
+        public FasterListDequePool() {
+<span class="fc" id="L111">            super(Versioning.initiALPOOL_CAPACITY);</span>
+<span class="fc" id="L112">        }</span>
+
+        @NotNull
+        @Override public FasterList create() {
+<span class="fc" id="L116">            return new FasterList(8);</span>
+        }
+    }
+
+    private static final class intDequePool extends DequePool&lt;int[]&gt; {
+        public intDequePool() {
+<span class="fc" id="L122">            super(Versioning.initiALPOOL_CAPACITY);</span>
+<span class="fc" id="L123">        }</span>
+
+        @NotNull
+        @Override public int[] create() {
+<span class="fc" id="L127">            return new int[stackLimit];</span>
+        }
+    }
+
+
+//    public boolean toStackString() {
+//
+//
+//
+//    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

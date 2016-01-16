@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Cons.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.op.software.scheme.cons</a> &gt; <span class="el_source">Cons.java</span></div><h1>Cons.java</h1><pre class="source lang-java linenums">package nars.op.software.scheme.cons;
+
+import com.google.common.collect.Iterators;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+public class Cons&lt;T&gt; implements Iterable&lt;T&gt; {
+<span class="fc" id="L15">    private static final Cons EMPTY = new Empty();</span>
+
+    private T car;
+    private Cons&lt;T&gt; cdr;
+
+<span class="fc" id="L20">    public Cons(T car, Cons&lt;T&gt; cdr) {</span>
+<span class="fc" id="L21">        this.car = car;</span>
+<span class="fc" id="L22">        this.cdr = cdr;</span>
+<span class="fc" id="L23">    }</span>
+
+    @NotNull
+    public static &lt;T&gt; Cons&lt;T&gt; cons(T car, Cons&lt;T&gt; cdr) {
+<span class="fc" id="L27">        return new Cons&lt;&gt;(car, cdr);</span>
+    }
+
+    @NotNull
+    @SafeVarargs
+    public static &lt;T&gt; Cons&lt;T&gt; copyOf(T... items) {
+<span class="fc" id="L33">        return copyOf(Arrays.asList(items));</span>
+    }
+
+    @NotNull
+    public static &lt;T&gt; Cons&lt;T&gt; copyOf(@NotNull Iterable&lt;? extends T&gt; items) {
+<span class="fc" id="L38">        Cons&lt;T&gt; result = empty();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (T t : items) {</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (result == empty()) {</span>
+<span class="fc" id="L41">                result = cons(t, empty());</span>
+            } else {
+<span class="fc" id="L43">                result.append(cons(t, empty()));</span>
+            }
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">        return result;</span>
+    }
+
+    public T car() {
+<span class="fc" id="L50">        return car;</span>
+    }
+
+    public Cons&lt;T&gt; cdr() {
+<span class="fc" id="L54">        return cdr;</span>
+    }
+
+    public void setCar(T car) {
+<span class="fc" id="L58">        this.car = car;</span>
+<span class="fc" id="L59">    }</span>
+
+    public void setCdr(Cons&lt;T&gt; cdr) {
+<span class="fc" id="L62">        this.cdr = cdr;</span>
+<span class="fc" id="L63">    }</span>
+
+    public T cadr() {
+<span class="fc" id="L66">        return cdr().car();</span>
+    }
+
+    public boolean isEmpty() {
+<span class="fc" id="L70">        return false;</span>
+    }
+
+    public long size() {
+<span class="fc" id="L74">        return stream().count();</span>
+    }
+
+
+
+    @NotNull
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;E&gt; Cons&lt;E&gt; empty() {
+<span class="fc" id="L82">        return (Cons&lt;E&gt;) EMPTY;</span>
+    }
+
+    @Override public Iterator&lt;T&gt; iterator() {
+<span class="fc" id="L86">        return new Iterator&lt;T&gt;() {</span>
+<span class="fc" id="L87">            private Cons&lt;T&gt; cons = Cons.this;</span>
+
+            @Override public boolean hasNext() {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                return cons != empty();</span>
+            }
+
+            @Override public T next() {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                if (!hasNext()) {</span>
+<span class="nc" id="L95">                    throw new NoSuchElementException();</span>
+                }
+
+<span class="fc" id="L98">                T next = cons.car;</span>
+<span class="fc" id="L99">                cons = cons.cdr;</span>
+
+<span class="fc" id="L101">                return next;</span>
+            }
+        };
+    }
+
+    @Override public void forEach(@NotNull Consumer&lt;? super T&gt; action) {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        for (T e : this) {</span>
+<span class="nc" id="L108">            action.accept(e);</span>
+<span class="nc" id="L109">        }</span>
+<span class="nc" id="L110">    }</span>
+
+    @Override public Spliterator&lt;T&gt; spliterator() {
+<span class="fc" id="L113">        return Spliterators.spliteratorUnknownSize(iterator(), Spliterator.NONNULL);</span>
+    }
+
+    @NotNull
+    public Stream&lt;T&gt; stream() {
+<span class="fc" id="L118">        return StreamSupport.stream(spliterator(), false);</span>
+    }
+
+    public void append(Cons&lt;T&gt; tail) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (cdr == empty()) {</span>
+<span class="fc" id="L123">            setCdr(tail);</span>
+        } else {
+<span class="fc" id="L125">            cdr.append(tail);</span>
+        }
+<span class="fc" id="L127">    }</span>
+
+    public List&lt;T&gt; toList() {
+<span class="fc" id="L130">        return stream().collect(Collectors.toList());</span>
+    }
+
+    public static &lt;T&gt; Collector&lt;T, Cons, Cons/*, Cons&lt;T&gt;, Cons&lt;T&gt;*/&gt; collector() {
+<span class="fc" id="L134">        return Collector.of(</span>
+<span class="fc" id="L135">                () -&gt; cons(null, empty()),</span>
+                (accumulator, e) -&gt; {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                    if (accumulator.car() == null) {</span>
+<span class="fc" id="L138">                        accumulator.setCar(e);</span>
+                    } else {
+<span class="fc" id="L140">                        accumulator.append(cons(e, empty()));</span>
+                    }
+<span class="fc" id="L142">                },</span>
+                (a, b) -&gt; {
+<span class="nc" id="L144">                    a.append(b);</span>
+<span class="nc" id="L145">                    return a;</span>
+                },
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                (accumulator) -&gt; accumulator.car() == null ? empty() : accumulator);</span>
+
+    }
+
+    public String toString() {
+<span class="nc" id="L152">        return String.format(&quot;(%s)&quot;,</span>
+<span class="nc" id="L153">                stream()</span>
+<span class="nc" id="L154">                        .map(Object::toString)</span>
+<span class="nc" id="L155">                        .collect(Collectors.joining(&quot; &quot;)));</span>
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L161">            return true;</span>
+        }
+
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (o == null || getClass() != o.getClass()) {</span>
+<span class="nc" id="L165">            return false;</span>
+        }
+
+<span class="fc" id="L168">        Cons&lt;T&gt; cons = (Cons&lt;T&gt;) o;</span>
+
+<span class="pc bpc" id="L170" title="2 of 4 branches missed.">        return car.equals(cons.car) &amp;&amp; cdr.equals(cons.cdr);</span>
+
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L176">        int result = car.hashCode();</span>
+<span class="nc" id="L177">        result = 31 * result + cdr.hashCode();</span>
+<span class="nc" id="L178">        return result;</span>
+    }
+
+
+    private static class Empty extends Cons&lt;Object&gt; {
+
+
+        public Empty() {
+<span class="fc" id="L186">            super(null, null);</span>
+<span class="fc" id="L187">        }</span>
+
+        @Override public Iterator&lt;Object&gt; iterator() {
+<span class="nc" id="L190">            return Iterators.emptyIterator();</span>
+        }
+
+        @Override public void forEach(@NotNull Consumer action) {
+<span class="nc" id="L194">        }</span>
+
+        @Override public Spliterator&lt;Object&gt; spliterator() {
+<span class="fc" id="L197">            return Spliterators.emptySpliterator();</span>
+        }
+
+        @NotNull
+        @Override
+        public Object car() {
+<span class="nc" id="L203">            throw new UnsupportedOperationException();</span>
+        }
+
+        @NotNull
+        @Override
+        public Cons&lt;Object&gt; cdr() {
+<span class="nc" id="L209">            throw new UnsupportedOperationException();</span>
+        }
+
+        @Override
+        public void setCar(Object car) {
+<span class="nc" id="L214">            throw new UnsupportedOperationException();</span>
+        }
+
+        @Override
+        public void setCdr(Cons&lt;Object&gt; cdr) {
+<span class="nc" id="L219">            throw new UnsupportedOperationException();</span>
+
+        }
+
+        @Override
+        public boolean isEmpty() {
+<span class="fc" id="L225">            return true;</span>
+        }
+
+        @Override
+        public void append(Cons&lt;Object&gt; tail) {
+<span class="nc" id="L230">            throw new UnsupportedOperationException();</span>
+        }
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

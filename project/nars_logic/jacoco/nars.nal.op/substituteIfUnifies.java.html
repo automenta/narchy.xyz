@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>substituteIfUnifies.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.op</a> &gt; <span class="el_source">substituteIfUnifies.java</span></div><h1>substituteIfUnifies.java</h1><pre class="source lang-java linenums">package nars.nal.op;
+
+import nars.Op;
+import nars.nal.meta.PremiseMatch;
+import nars.term.Term;
+import nars.term.compound.Compound;
+import nars.term.transform.FindSubst;
+import nars.util.data.random.XorShift128PlusRandom;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Random;
+
+/** substituteIfUnifies(term, variableType, varFrom, varTo) */
+<span class="fc" id="L15">public final class substituteIfUnifies extends substitute {</span>
+
+
+
+    @Nullable
+    @Override public Term function(@NotNull Compound p, @NotNull PremiseMatch r) {
+<span class="fc" id="L21">        final Term[] xx = p.terms();</span>
+<span class="fc" id="L22">        final Term term = xx[0];</span>
+<span class="fc" id="L23">        final Term op = xx[1];</span>
+<span class="fc" id="L24">        final Term x = xx[2];</span>
+<span class="fc" id="L25">        final Term y = xx[3];</span>
+
+<span class="fc" id="L27">        FindSubst umap = unifies(op, x, y);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (umap!=null) {</span>
+            //umap.putXY(term, y);
+<span class="fc" id="L30">            return subst(r, umap, term);</span>
+        }
+
+<span class="fc" id="L33">        return term;</span>
+    }
+
+    static FindSubst unifies(@NotNull Term op, @NotNull Term x, @NotNull Term y) {
+<span class="fc" id="L37">        Op o = getOp(op);</span>
+<span class="fc" id="L38">        Random rng = new XorShift128PlusRandom(1);</span>
+<span class="fc" id="L39">        FindSubst sub = new FindSubst(o, rng) {</span>
+            @Override public boolean onMatch() {
+                //should not get called by .match only
+<span class="nc" id="L42">                return false;</span>
+            }
+        };
+
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (sub.match(x, y)) {</span>
+<span class="fc" id="L47">            return sub;</span>
+        }
+
+<span class="fc" id="L50">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

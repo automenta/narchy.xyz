@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>NQuadsRDF.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.task.in</a> &gt; <span class="el_source">NQuadsRDF.java</span></div><h1>NQuadsRDF.java</h1><pre class="source lang-java linenums">package nars.task.in;
+
+import nars.NAR;
+import nars.nal.Tense;
+import nars.task.MutableTask;
+import nars.task.Task;
+import nars.term.Term;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.semanticweb.yars.nx.Node;
+import org.semanticweb.yars.nx.parser.NxParser;
+
+import javax.xml.namespace.QName;
+import java.io.InputStream;
+import java.util.Collections;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+import static nars.$.*;
+
+/**
+ * Created by me on 6/4/15.
+ */
+<span class="nc" id="L26">public abstract class NQuadsRDF {</span>
+
+
+    private static final String RDF_URI = &quot;http://www.w3.org/1999/02/22-rdf-syntax-ns#&quot;;
+
+    //private static String parentTagName = null;
+
+    //private final NAR nar;
+
+    //final float beliefConfidence;
+    //private boolean includeDataType = false;
+
+//    public NQuadsRDF(NAR n, float beliefConfidence) throws Exception {
+//        this.nar = n;
+//        this.beliefConfidence = beliefConfidence;
+//    }
+
+    //input(new FileInputStream(nqLoc));
+
+//
+//    final static Pattern nQuads = Pattern.compile(
+//            //&quot;((?:\&quot;[^\&quot;\\\\]*(?:\\\\.[^\&quot;\\\\]*)*\&quot;(?:@\\w+(?:-\\w+)?|\\^\\^&lt;[^&gt;]+&gt;)?)|&lt;[^&gt;]+&gt;|\\_\\:\\w+|\\.)&quot;
+//            &quot;(&lt;[^\\s]+&gt;|_:(?:[A-Za-z][A-Za-z0-9\\-_]*))\\s+(&lt;[^\\s]+&gt;)\\s+(&lt;[^\\s]+&gt;|_:(?:[A-Za-z][A-Za-z0-9\\-_]*)|\\\&quot;(?:(?:\\\&quot;|[^\&quot;])*)\\\&quot;(?:@(?:[a-z]+[\\-A-Za-z0-9]*)|\\^\\^&lt;(?:[^&gt;]+)&gt;)?)\\s+(&lt;[^\\s]+&gt;).*&quot;
+//    );
+
+    public static void input(@NotNull NAR nar, String input) throws Exception {
+<span class="fc" id="L52">        NxParser p  = new NxParser();</span>
+<span class="fc" id="L53">        p.parse(Collections.singleton(input));</span>
+<span class="fc" id="L54">        input(nar, p);</span>
+<span class="fc" id="L55">    }</span>
+
+    public static void input(@NotNull NAR nar, @NotNull InputStream input) throws Exception {
+        //try {
+<span class="nc" id="L59">            NxParser p = new NxParser();</span>
+<span class="nc" id="L60">            p.parse(input);</span>
+<span class="nc" id="L61">            input(nar, p);</span>
+        //}
+//        catch (Exception pe) {
+//            //try turtle parser
+//            TurtleParser p = new TurtleParser();
+//            p.parse(new InputStreamReader(input), URI.create(&quot;_&quot;));
+//            input(nar, p);
+//        }
+<span class="nc" id="L69">    }</span>
+
+    public static void input(@NotNull NAR nar, @NotNull Iterable&lt;Node[]&gt; nxp) {
+<span class="fc" id="L72">        input(nar, StreamSupport.stream(nxp.spliterator(), false));</span>
+<span class="fc" id="L73">    }</span>
+
+    public static void input(@NotNull NAR nar, @NotNull Stream&lt;Node[]&gt; nxp) {
+
+<span class="fc" id="L77">        nar.input(</span>
+<span class="fc" id="L78">            nxp.map( (Node[] nx) -&gt; {</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (nx.length &gt;= 3) {</span>
+<span class="fc" id="L80">                    return input(</span>
+                            nar,
+<span class="fc" id="L82">                            resource(nx[0]),</span>
+<span class="fc" id="L83">                            resource(nx[1]),</span>
+<span class="fc" id="L84">                            resource(nx[2])</span>
+                    );
+                }
+<span class="nc" id="L87">                return null;</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            } ).filter(x -&gt; x!=null)</span>
+        );
+
+
+
+<span class="fc" id="L93">    }</span>
+
+//    public static void input(NAR nar, File input) throws Exception {
+//        input(nar, new Scanner(input));
+//    }
+
+
+
+
+//    /**
+//     * These parsing rules were devised by physically looking at the OWL file
+//     * and figuring out what goes where. This should by no means be considered a
+//     * generalized way to parse OWL files.
+//     *
+//     * Parsing rules:
+//     *
+//     * owl:Class@rdf:ID = entity (1), type=Wine optional:
+//     * owl:Class/rdfs:subClassOf@rdf:resource = entity (2), type=Wine (2) --
+//     * parent --&gt; (1) if owl:Class/rdfs:subClassOf has no attributes, ignore if
+//     * no owl:Class/rdfs:subClassOf entity, ignore it
+//     * owl:Class/owl:Restriction/owl:onProperty@rdf:resource related to
+//     * owl:Class/owl:Restriction/owl:hasValue@rdf:resource
+//     *
+//     * Region@rdf:ID = entity, type=Region optional:
+//     * Region/locatedIn@rdf:resource=entity (2), type=Region (2) -- parent --
+//     * (1) owl:Class/rdfs:subClassOf/owl:Restriction - ignore
+//     *
+//     * WineBody@rdf:ID = entity, type=WineBody WineColor@rdf:ID = entity,
+//     * type=WineColor WineFlavor@rdf:ID = entity, type=WineFlavor
+//     * WineSugar@rdf:ID = entity, type=WineSugar Winery@rdf:ID = entity,
+//     * type=Winery WineGrape@rdf:ID = entity, type=WineGrape
+//     *
+//     * Else if no namespace, this must be a wine itself, capture as entity:
+//     * ?@rdf:ID = entity, type=Wine all subtags are relations: tagname =
+//     * relation_name tag@rdf:resource = target entity
+//     */
+//    public static void input(NAR nar, Scanner f) throws Exception {
+//
+//        List&lt;String&gt; items = Global.newArrayList(4);
+//
+//        f.useDelimiter(&quot;\n&quot;).forEachRemaining(s -&gt; {
+//            s = s.trim();
+////            if (s.startsWith(&quot;#&quot;)) //?
+////                return;
+////            if (s.startsWith(&quot;@&quot;)) //@prefix not handled yet?
+////                return;
+//
+//            Matcher m = nQuads.matcher(s);
+//            items.clear();
+//            while(m.find()) {
+//                String t = s.substring(m.start(), m.end());
+//                items.add(t);
+//            }
+//
+//            System.out.println(s + &quot; &quot; + m.toMatchResult());
+//
+//            if (items.size() &gt;= 3) {
+//
+//
+//                Atom subj = resource(items.get(0));
+//                Atom pred = resource(items.get(1));
+//                Term obj = resourceOrValue(items.get(2));
+//                if (subj != null &amp;&amp; obj != null &amp;&amp; pred != null) {
+//                    if (!subj.equals(obj))  { //avoid equal subj &amp; obj, if only namespace differs
+//                        //try {
+//                            input(nar, subj, pred, obj);
+//                        //}
+////                        catch (InvalidInputException iie) {
+////                            System.err.println(iie);
+////                            //iie.printStackTrace();
+////                        }
+//                    }
+//                }
+//            }
+//        });
+//    }
+
+    //TODO interpret Node subclasses in special ways, possibly returning Compounds not only Atom's
+    public static Atom resource(@NotNull Node n) {
+<span class="fc" id="L172">        String s = n.getLabel();</span>
+        //if (s.startsWith(&quot;&lt;&quot;) &amp;&amp; s.endsWith(&quot;&gt;&quot;)) {
+            //s = s.substring(1, s.length() - 1);
+
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (s.contains(&quot;#&quot;)) {</span>
+<span class="fc" id="L177">                String[] a = s.split(&quot;#&quot;);</span>
+<span class="fc" id="L178">                String p = a[0]; //TODO handle the namespace</span>
+<span class="fc" id="L179">                s = a[1];</span>
+<span class="fc" id="L180">            }</span>
+            else {
+<span class="fc" id="L182">                String[] a = s.split(&quot;/&quot;);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                if (a.length == 0) return null;</span>
+<span class="fc" id="L184">                s = a[a.length - 1];</span>
+            }
+
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (s.isEmpty()) return null;</span>
+
+<span class="fc" id="L189">            return Atom.the(s, true);</span>
+        //}
+        //else
+          //  return null;
+    }
+//    public static Term resourceOrValue(String s) {
+//        Atom a = resource(s);
+//        if (a == null) {
+//            //...
+//        }
+//        return a;
+//    }
+
+//
+//
+//    abstract public static class TagProcessor {
+//
+//        abstract protected void execute(XMLStreamReader parser);
+//    }
+
+
+    public static Term atom(@NotNull String uri) {
+<span class="nc" id="L211">        int lastSlash = uri.lastIndexOf('/');</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (lastSlash!=-1)</span>
+<span class="nc" id="L213">            uri = uri.substring(lastSlash + 1);</span>
+
+<span class="nc bnc" id="L215" title="All 6 branches missed.">        switch(uri) {</span>
+<span class="nc" id="L216">            case &quot;owl#Thing&quot;: uri = &quot;thing&quot;; break;</span>
+        }
+
+<span class="nc" id="L219">        return Atom.the(uri);</span>
+    }
+
+//
+//    //TODO make this abstract for inserting the fact in different ways
+//    protected void inputClass(Term clas) {
+//        inputClassBelief(clas);
+//    }
+
+//    private void inputClassBelief(Term clas) {
+//        nar.believe(isAClass(clas));
+//    }
+
+//    public static Term isAClass(Term clas) {
+//        return Instance.make(clas, owlClass);
+//    }
+
+<span class="fc" id="L236">    public static final Atom owlClass = Atom.the(&quot;Class&quot;);</span>
+<span class="fc" id="L237">    static final Atom parentOf = Atom.the(&quot;parentOf&quot;);</span>
+<span class="fc" id="L238">    static final Atom type = Atom.the(&quot;type&quot;);</span>
+<span class="fc" id="L239">    static final Atom subClassOf = Atom.the(&quot;subClassOf&quot;);</span>
+<span class="fc" id="L240">    static final Atom subPropertyOf = Atom.the(&quot;subPropertyOf&quot;);</span>
+<span class="fc" id="L241">    static final Atom equivalentClass = Atom.the(&quot;equivalentClass&quot;);</span>
+<span class="fc" id="L242">    static final Atom equivalentProperty = Atom.the(&quot;equivalentProperty&quot;);</span>
+<span class="fc" id="L243">    static final Atom inverseOf = Atom.the(&quot;inverseOf&quot;);</span>
+<span class="fc" id="L244">    static final Atom disjointWith = Atom.the(&quot;disjointWith&quot;);</span>
+<span class="fc" id="L245">    static final Atom domain = Atom.the(&quot;domain&quot;);</span>
+<span class="fc" id="L246">    static final Atom range = Atom.the(&quot;range&quot;);</span>
+<span class="fc" id="L247">    static final Atom sameAs = Atom.the(&quot;sameAs&quot;);</span>
+<span class="fc" id="L248">    static final Atom differentFrom = Atom.the(&quot;differentFrom&quot;);</span>
+<span class="fc" id="L249">    static final Atom dataTypeProperty = Atom.the(&quot;DatatypeProperty&quot;);</span>
+
+    @Nullable
+    static Term subjObjInst(Term subject, char subjType, char objType, boolean reverse) {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        String a = reverse ? &quot;subj&quot; : &quot;obj&quot;;</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        String b = reverse ? &quot;obj&quot; : &quot;subj&quot;;</span>
+<span class="nc" id="L255">        return inst(</span>
+<span class="nc" id="L256">                p(v(subjType, a), v(objType, b)),</span>
+                subject);
+    }
+
+    /**
+     * Saves the relation into the database. Both entities must exist if the
+     * relation is to be saved. Takes care of updating relation_types as well.
+     *
+     */
+    public static Task input(@NotNull NAR nar,
+                             @Nullable Atom subject,
+                             @NotNull Atom predicate, @NotNull Term object) {
+
+        //http://www.w3.org/TR/owl-ref/
+
+<span class="fc" id="L271">        Term belief = null;</span>
+
+        //noinspection IfStatementWithTooManyBranches
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (predicate.equals(type)</span>
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">                ||predicate.equals(subClassOf)||predicate.equals(subPropertyOf)) {</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            if (object.equals(owlClass)) {</span>
+<span class="nc" id="L277">                return null;</span>
+            }
+
+            //if (!includeDataType) {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                if (object.equals(dataTypeProperty)) {</span>
+<span class="nc" id="L282">                    return null;</span>
+                }
+            //}
+
+<span class="nc" id="L286">            belief = (Compound) inh(subject, object);</span>
+
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        } else if ((predicate.equals(parentOf))) {</span>
+            //.. parentOf is probably redundant
+        }
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        else if (predicate.equals(equivalentClass)) {</span>
+
+<span class="nc" id="L293">            belief = equiv(</span>
+<span class="nc" id="L294">                inst(varIndep(1), subject),</span>
+<span class="nc" id="L295">                inst(varIndep(1), object)</span>
+            );
+        }
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        else if (predicate.equals(sameAs)) {</span>
+<span class="nc" id="L299">            belief = sim(subject, object);</span>
+        }
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        else if (predicate.equals(differentFrom)) {</span>
+<span class="nc" id="L302">            belief = neg(sim(subject, object));</span>
+        }
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        else if (predicate.equals(domain)) {</span>
+            // PROPERTY domain CLASS
+            //&lt;PROPERTY($subj, $obj) ==&gt; &lt;$subj {-- CLASS&gt;&gt;.
+
+
+<span class="nc" id="L309">            Term b = inst(varIndep(&quot;subj&quot;), object);</span>
+<span class="nc" id="L310">            belief = conj(subjObjInst(subject, '$', '#', false),b);</span>
+<span class="nc" id="L311">        }</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        else if (predicate.equals(range)) {</span>
+            // PROPERTY range CLASS
+            //&lt;PROPERTY($subj, $obj) ==&gt; &lt;$obj {-- CLASS&gt;&gt;.
+
+<span class="nc" id="L316">            Term b = inst(varIndep(&quot;obj&quot;), object);</span>
+<span class="nc" id="L317">            belief = conj(subjObjInst(subject, '#', '$', false),b);</span>
+
+//            belief = nar.term(
+//                    //&quot;&lt;&quot; + subject + &quot;($subj,$obj) ==&gt; &lt;$obj {-- &quot; + object + &quot;&gt;&gt;&quot;
+//                    &quot;(&quot; + subject + &quot;($subj,$obj) &amp;&amp; &lt;$obj {-- &quot; + object + &quot;&gt;)&quot;
+//            );
+
+<span class="nc" id="L324">        }</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        else if (predicate.equals(equivalentProperty)) {</span>
+
+<span class="nc" id="L327">            belief = sim(subject, object);</span>
+        }
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        else if (predicate.equals(inverseOf)) {</span>
+
+            //PREDSUBJ(#subj, #obj) &lt;=&gt; PREDOBJ(#obj, #subj)
+<span class="nc" id="L332">            belief = equiv(</span>
+<span class="nc" id="L333">                    subjObjInst(subject, '$', '$', false),</span>
+<span class="nc" id="L334">                    subjObjInst(object, '$', '$', true));</span>
+
+        }
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        else if (predicate.equals(disjointWith)) {</span>
+            //System.out.println(subject + &quot; &quot; + predicate + &quot; &quot; + object);
+
+            //disjoint classes have no common instances:
+            // (--, (&amp;&amp;, {#x} --&gt; subject, {#x} --&gt; object ) ).
+<span class="nc" id="L342">            Term x = varDep(1);</span>
+<span class="nc" id="L343">            belief = neg(conj(inst(x, subject), inst(x,object)));</span>
+<span class="nc" id="L344">        }</span>
+        else {
+<span class="pc bpc" id="L346" title="3 of 6 branches missed.">            if (subject!=null &amp;&amp; object!=null &amp;&amp; predicate!=null) {</span>
+<span class="fc" id="L347">                belief = (Compound) inst(</span>
+<span class="fc" id="L348">                        p(subject, object),</span>
+                        predicate
+                );
+            }
+        }
+
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (belief instanceof Compound) {</span>
+            //System.out.println(subject + &quot; &quot; + predicate + &quot; &quot; + object + &quot; :: &quot; + belief);
+
+<span class="fc" id="L357">            return new MutableTask().term((Compound)belief).</span>
+<span class="fc" id="L358">                    belief().truth(1.0f,0.95f)</span>
+<span class="fc" id="L359">                    .time(nar.time(),</span>
+                    Tense.ETERNAL //TODO Tense parameter
+                    );
+        }
+
+<span class="nc" id="L364">        return null;</span>
+    }
+
+
+
+    // ======== String manipulation methods ========
+    /**
+     * Format the XML tag. Takes as input the QName of the tag, and formats it
+     * to a namespace:tagname format.
+     *
+     * @param qname the QName for the tag.
+     * @return the formatted QName for the tag.
+     */
+    @NotNull
+    private String formatTag(@NotNull QName qname) {
+<span class="nc" id="L379">        String prefix = qname.getPrefix();</span>
+<span class="nc" id="L380">        String suffix = qname.getLocalPart();</span>
+
+<span class="nc" id="L382">        suffix = suffix.replace(&quot;http://dbpedia.org/ontology/&quot;, &quot;&quot;);</span>
+
+<span class="nc bnc" id="L384" title="All 4 branches missed.">        return prefix == null || prefix.isEmpty() ? suffix : prefix + ':' + suffix;</span>
+    }
+
+    /**
+     * Split up Uppercase Camelcased names (like Java classnames or C++ variable
+     * names) into English phrases by splitting wherever there is a transition
+     * from lowercase to uppercase.
+     *
+     * @param name the input camel cased name.
+     * @return the &quot;english&quot; name.
+     */
+    private String getEnglishName(@NotNull String name) {
+<span class="nc" id="L396">        StringBuilder englishNameBuilder = new StringBuilder();</span>
+<span class="nc" id="L397">        char[] namechars = name.toCharArray();</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        for (int i = 0; i &lt; namechars.length; i++) {</span>
+<span class="nc bnc" id="L399" title="All 4 branches missed.">            if (i &gt; 0 &amp;&amp; Character.isUpperCase(namechars[i])</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">                    &amp;&amp; Character.isLowerCase(namechars[i - 1])) {</span>
+<span class="nc" id="L401">                englishNameBuilder.append(' ');</span>
+            }
+<span class="nc" id="L403">            englishNameBuilder.append(namechars[i]);</span>
+        }
+<span class="nc" id="L405">        return englishNameBuilder.toString();</span>
+    }
+
+//    public static void main(String[] args) throws Exception {
+//        Default n = new Default(1000,16,3);
+//        //Solid d = new Solid(32, 4096,1,3,1,2);
+//        //d.setInternalExperience(null).level(7);
+//        //d.inputsMaxPerCycle.set(256);
+//        //d.setTermLinkBagSize(64);
+//
+//
+//
+//        //n.input(&quot;schizo(I)!&quot;); //needs nal8
+//
+//
+//
+//        new NQuadsRDF(n, &quot;/home/me/Downloads/dbpedia.n4&quot;, 0.94f /* conf */) {
+//
+//            @Override
+//            protected void believe(Compound assertion) {
+//                float freq = 1.0f;
+//
+//                //insert with zero priority to bypass main memory go directly to subconcepts
+//                n.believe(0.01f, Global.DEFAULT_JUDGMENT_DURABILITY, assertion, Tense.Eternal, freq, beliefConfidence);
+//            }
+//        };
+//
+//
+//        //new TextOutput(n, System.out).setShowStamp(false).setOutputPriorityMin(0.25f);
+//
+//        n.frame(1);
+//        n.frame(1); //one more to be sure
+//
+//
+///*
+//        //n.frame(100);
+//        n.believe(0.75f, 0.8f, n.term(&quot;&lt;Spacecraft &lt;-&gt; PopulatedPlace&gt;!&quot;),
+//                Tense.Eternal, 1.0f, 0.95f);
+//        n.believe(0.75f, 0.8f, n.term(&quot;(&amp;&amp;,SpaceMission,Work). :|:&quot;),
+//                Tense.Eternal, 1.0f, 0.95f);
+//        //n.frame(5000);
+//*/
+//        //n.run();
+//    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

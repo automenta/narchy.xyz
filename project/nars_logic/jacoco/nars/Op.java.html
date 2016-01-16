@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Op.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars</a> &gt; <span class="el_source">Op.java</span></div><h1>Op.java</h1><pre class="source lang-java linenums">package nars;
+
+
+import com.gs.collections.api.tuple.primitive.IntIntPair;
+import nars.nal.Tense;
+import nars.term.Term;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+
+import static com.gs.collections.impl.tuple.primitive.PrimitiveTuples.pair;
+
+/**
+ * NAL symbol table
+ */
+<span class="pc" id="L18">public enum Op {</span>
+
+    /**
+     * an atomic term (includes interval and variables); this value is set if not a compound term
+     */
+<span class="fc" id="L23">    ATOM(&quot;.&quot;, Op.ANY, OpType.Other),</span>
+    //        public final Atom get(String i) {
+//            return Atom.the(i);
+//        }}
+//
+<span class="fc" id="L28">    VAR_INDEP(Symbols.VAR_INDEPENDENT, 6 /*NAL6 for Indep Vars */, OpType.Variable),</span>
+<span class="fc" id="L29">    VAR_DEP(Symbols.VAR_DEPENDENT, Op.ANY, OpType.Variable),</span>
+<span class="fc" id="L30">    VAR_QUERY(Symbols.VAR_QUERY, Op.ANY, OpType.Variable),</span>
+
+<span class="fc" id="L32">    OPERATOR(&quot;^&quot;, 8, Args.One),</span>
+
+<span class="fc" id="L34">    NEGATE(&quot;--&quot;, 5, Args.One),</span>
+
+    /* Relations */
+<span class="fc" id="L37">    INHERIT(&quot;--&gt;&quot;, 1, OpType.Relation, Args.Two),</span>
+<span class="fc" id="L38">    SIMILAR(&quot;&lt;-&gt;&quot;, true, 2, OpType.Relation, Args.Two),</span>
+
+
+    /* CompountTerm operators */
+<span class="fc" id="L42">    INTERSECT_EXT(&quot;&amp;&quot;, true, 3, Args.GTETwo),</span>
+<span class="fc" id="L43">    INTERSECT_INT(&quot;|&quot;, true, 3, Args.GTETwo),</span>
+
+<span class="fc" id="L45">    DIFF_EXT(&quot;-&quot;, 3, Args.Two),</span>
+<span class="fc" id="L46">    DIFF_INT(&quot;~&quot;, 3, Args.Two),</span>
+
+<span class="fc" id="L48">    PRODUCT(&quot;*&quot;, 4, Args.GTEZero),</span>
+
+<span class="fc" id="L50">    IMAGE_EXT(&quot;/&quot;, 4, Args.GTEOne),</span>
+<span class="fc" id="L51">    IMAGE_INT(&quot;\\&quot;, 4, Args.GTEOne),</span>
+
+    /* CompoundStatement operators, length = 2 */
+<span class="fc" id="L54">    DISJUNCTION(&quot;||&quot;, true, 5, Args.GTETwo),</span>
+<span class="fc" id="L55">    CONJUNCTION(&quot;&amp;&amp;&quot;, true, 5, Args.GTETwo),</span>
+
+<span class="fc" id="L57">    SPACE(&quot;+&quot;, true, 7, Args.GTEOne),</span>
+
+
+    /* CompountTerm delimiters, must use 4 different pairs */
+<span class="fc" id="L61">    SET_INT_OPENER(&quot;[&quot;, true, 2, Args.GTEOne), //OPENER also functions as the symbol for the entire compound</span>
+<span class="fc" id="L62">    SET_EXT_OPENER(&quot;{&quot;, true, 2, Args.GTEOne), //OPENER also functions as the symbol for the entire compound</span>
+
+
+<span class="fc" id="L65">    IMPLICATION(&quot;==&gt;&quot;, 5, OpType.Relation, Args.Two),</span>
+
+<span class="fc" id="L67">    EQUIV(&quot;&lt;=&gt;&quot;, true, 5, OpType.Relation, Args.Two),</span>
+
+
+    // keep all items which are invlved in the lower 32 bit structuralHash above this line
+    // so that any of their ordinal values will not exceed 31
+    //-------------
+<span class="fc" id="L73">    NONE('\u2205', Op.ANY, null),</span>
+
+<span class="fc" id="L75">    VAR_PATTERN(Symbols.VAR_PATTERN, Op.ANY, OpType.Variable),</span>
+
+<span class="fc" id="L77">    INSTANCE(&quot;{--&quot;, 2, OpType.Relation), //should not be given a compact representation because this will not exist internally after parsing</span>
+<span class="fc" id="L78">    PROPERTY(&quot;--]&quot;, 2, OpType.Relation), //should not be given a compact representation because this will not exist internally after parsing</span>
+<span class="fc" id="L79">    INSTANCE_PROPERTY(&quot;{-]&quot;, 2, OpType.Relation); //should not be given a compact representation because this will not exist internally after parsing</span>
+
+
+    //-----------------------------------------------------
+
+
+    /** Image index (&quot;imdex&quot;) symbol */
+<span class="fc" id="L86">    public static final Atom Imdex = Atom.the(&quot;_&quot;);</span>
+
+
+
+    /**
+     * symbol representation of this getOperator
+     */
+    @NotNull
+    public final String str;
+
+    /**
+     * character representation of this getOperator if symbol has length 1; else ch = 0
+     */
+    public final char ch;
+
+    public final OpType type;
+
+    /** arity limits, range is inclusive &gt;= &lt;=
+     *  -1 for unlimited */
+    public final int minSize, maxSize;
+
+    /**
+     * opener?
+     */
+    public final boolean opener;
+
+    /**
+     * closer?
+     */
+    public final boolean closer;
+
+    /**
+     * minimum NAL level required to use this operate, or 0 for N/A
+     */
+    public final int minLevel;
+
+    private final boolean commutative;
+
+
+//    Op(char c, int minLevel) {
+//        this(c, minLevel, Args.NoArgs);
+//    }
+
+    Op(char c, int minLevel, OpType type) {
+<span class="fc" id="L130">        this(c, minLevel, type, Args.None);</span>
+<span class="fc" id="L131">    }</span>
+
+    Op(@NotNull String s, boolean commutative, int minLevel) {
+<span class="nc" id="L134">        this(s, minLevel, OpType.Other, Args.None);</span>
+<span class="nc" id="L135">    }</span>
+    Op(@NotNull String s, boolean commutative, int minLevel, @NotNull IntIntPair size) {
+<span class="fc" id="L137">        this(s, commutative, minLevel, OpType.Other, size);</span>
+<span class="fc" id="L138">    }</span>
+
+    Op(char c, int minLevel, OpType type, @NotNull IntIntPair size) {
+<span class="fc" id="L141">        this(Character.toString(c), minLevel, type, size);</span>
+<span class="fc" id="L142">    }</span>
+
+    Op(@NotNull String string, int minLevel, @NotNull IntIntPair size) {
+<span class="fc" id="L145">        this(string, minLevel, OpType.Other, size);</span>
+<span class="fc" id="L146">    }</span>
+
+    Op(@NotNull String string, int minLevel, OpType type) {
+<span class="fc" id="L149">        this(string, false /* non-commutive */, minLevel, type, Args.None);</span>
+<span class="fc" id="L150">    }</span>
+    Op(@NotNull String string, int minLevel, OpType type, @NotNull IntIntPair size) {
+<span class="fc" id="L152">        this(string, false /* non-commutive */, minLevel, type, size);</span>
+<span class="fc" id="L153">    }</span>
+
+<span class="fc" id="L155">    Op(@NotNull String string, boolean commutative, int minLevel, OpType type, @NotNull IntIntPair size) {</span>
+
+<span class="fc" id="L157">        this.str = string;</span>
+
+<span class="fc" id="L159">        this.commutative = commutative;</span>
+<span class="fc" id="L160">        this.minLevel = minLevel;</span>
+<span class="fc" id="L161">        this.type = type;</span>
+
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        this.ch = string.length() == 1 ? string.charAt(0) : 0;</span>
+
+<span class="fc" id="L165">        this.opener = name().endsWith(&quot;_OPENER&quot;);</span>
+<span class="fc" id="L166">        this.closer = name().endsWith(&quot;_CLOSER&quot;);</span>
+
+<span class="fc" id="L168">        this.minSize= size.getOne();</span>
+<span class="fc" id="L169">        this.maxSize = size.getTwo();</span>
+
+
+<span class="fc" id="L172">    }</span>
+
+    public static boolean isOperation(Term t) {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (!(t instanceof Compound)) return false;</span>
+<span class="fc" id="L176">        Compound c = (Compound)t;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        return c.op().isA(OperationBits) &amp;&amp;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">               c.op(Op.INHERIT) &amp;&amp;</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">               c.size() == 2 &amp;&amp;</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">               c.term(1).op(Op.OPERATOR) &amp;&amp;</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">               c.term(0).op(Op.PRODUCT);</span>
+    }
+
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="fc" id="L188">        return str;</span>
+    }
+
+    /**
+     * alias
+     */
+<span class="fc" id="L194">    public static final Op SET_EXT = Op.SET_EXT_OPENER;</span>
+<span class="fc" id="L195">    public static final Op SET_INT = Op.SET_INT_OPENER;</span>
+
+
+    @NotNull
+    public final String toString(@NotNull Compound c)  {
+<span class="nc" id="L200">        int t = c.t();</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        boolean hasTime = t != Tense.ITERNAL;</span>
+
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (!hasTime) {</span>
+<span class="nc" id="L204">            return str;</span>
+        } else {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            return str + ( (t &gt;= 0) ? &quot;+&quot; : &quot;&quot;) + (Integer.toString(t));</span>
+        }
+    }
+
+    /**
+     * writes this operator to a Writer in (human-readable) expanded UTF16 mode
+     */
+    public final void append(@NotNull Compound c, @NotNull Appendable w) throws IOException {
+<span class="fc" id="L214">        int t = c.t();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        boolean hasTime = t != Tense.ITERNAL;</span>
+
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (hasTime)</span>
+<span class="fc" id="L218">            w.append(' ');</span>
+
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (ch == 0)</span>
+<span class="fc" id="L221">            w.append(str);</span>
+        else
+<span class="fc" id="L223">            w.append(ch);</span>
+
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (hasTime) {</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (t &gt;= 0) w.append('+');</span>
+<span class="fc" id="L227">            w.append(Integer.toString(t)).append(' ');</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    public static int or(@NotNull int... i) {
+<span class="fc" id="L232">        int bits = 0;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (int x : i) {</span>
+<span class="fc" id="L234">            bits |= x;</span>
+        }
+<span class="fc" id="L236">        return bits;</span>
+    }
+    public static int or(@NotNull Op... o) {
+<span class="fc" id="L239">        int bits = 0;</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (Op n : o)</span>
+<span class="fc" id="L241">            bits |= n.bit();</span>
+<span class="fc" id="L242">        return bits;</span>
+    }
+
+    public final int bit() {
+<span class="fc" id="L246">        return (1 &lt;&lt; ordinal());</span>
+    }
+
+    public static int or(int bits, @NotNull Op o) {
+<span class="fc" id="L250">        return bits | o.bit();</span>
+    }
+
+
+    /**
+     * specifier for any NAL level
+     */
+    public static final int ANY = 0;
+
+    public final boolean isVar() {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        return type == Op.OpType.Variable;</span>
+    }
+
+    public boolean isCommutative() {
+<span class="fc" id="L264">        return commutative;</span>
+    }
+
+<span class="fc" id="L267">    public final static int TemporalBits = or(CONJUNCTION, IMPLICATION, Op.EQUIV);</span>
+
+    /** whether this op allows temporal relation (true) or ignores it  (false) */
+    public boolean isTemporal() {
+<span class="fc" id="L271">        return isA(TemporalBits);</span>
+    }
+
+    public boolean validSize(int length) {
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">        if (minSize!=-1 &amp;&amp; length &lt; minSize) return false;</span>
+<span class="pc bpc" id="L276" title="1 of 4 branches missed.">        return !(maxSize != -1 &amp;&amp; length &gt; maxSize);</span>
+    }
+
+    public boolean isImage() {
+<span class="fc" id="L280">        return isA(ImageBits);</span>
+    }
+
+    public boolean isConjunctive() {
+<span class="fc" id="L284">        return isA(ConjunctivesBits);</span>
+    }
+
+
+    public boolean isStatement() {
+<span class="fc" id="L289">        return isA(StatementBits);</span>
+    }
+
+    public boolean isA(int vector) {
+<span class="fc" id="L293">        return isA(bit(), vector);</span>
+    }
+
+    static boolean isA(int needle, int haystack) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        return (needle &amp; haystack) == needle;</span>
+    }
+
+    public boolean isSet() {
+<span class="fc" id="L301">        return isA(Op.SetsBits);</span>
+    }
+
+    public boolean isImplication() {
+<span class="nc" id="L305">        return isA(ImplicationsBits);</span>
+    }
+
+
+    /** top-level Op categories */
+<span class="pc" id="L310">    public enum OpType {</span>
+<span class="fc" id="L311">        Relation,</span>
+<span class="fc" id="L312">        Variable,</span>
+<span class="fc" id="L313">        Other</span>
+    }
+
+
+<span class="fc" id="L317">    @Deprecated public static final int ImplicationsBits =</span>
+<span class="fc" id="L318">            Op.or(Op.IMPLICATION);</span>
+
+<span class="fc" id="L320">    @Deprecated public static final int ConjunctivesBits =</span>
+<span class="fc" id="L321">            Op.or(Op.CONJUNCTION);</span>
+
+<span class="fc" id="L323">    @Deprecated public static final int EquivalencesBits =</span>
+<span class="fc" id="L324">            Op.or(Op.EQUIV);</span>
+
+<span class="fc" id="L326">    public static final int SetsBits =</span>
+<span class="fc" id="L327">            Op.or(Op.SET_EXT, Op.SET_INT);</span>
+
+    /** all Operations will have these 3 elements in its subterms: */
+<span class="fc" id="L330">    public static final int OperationBits =</span>
+<span class="fc" id="L331">            Op.or(Op.INHERIT, Op.PRODUCT, OPERATOR);</span>
+
+<span class="fc" id="L333">    public static final int StatementBits =</span>
+<span class="fc" id="L334">            Op.or(Op.INHERIT.bit(), Op.SIMILAR.bit(),</span>
+                    EquivalencesBits,
+                    ImplicationsBits
+            );
+
+<span class="fc" id="L339">    public static final int ImplicationOrEquivalenceBits = or(Op.EquivalencesBits, Op.ImplicationsBits);</span>
+
+<span class="fc" id="L341">    public static final int ImageBits =</span>
+<span class="fc" id="L342">        Op.or(Op.IMAGE_EXT,Op.IMAGE_INT);</span>
+
+<span class="fc" id="L344">    public static final int VariableBits =</span>
+<span class="fc" id="L345">        Op.or(Op.VAR_PATTERN,Op.VAR_INDEP,Op.VAR_DEP,Op.VAR_QUERY);</span>
+<span class="fc" id="L346">    public static final int WildVariableBits =</span>
+<span class="fc" id="L347">            Op.or(Op.VAR_PATTERN,Op.VAR_QUERY);</span>
+
+
+
+<span class="pc" id="L351">    enum Args {</span>
+        ;
+<span class="fc" id="L353">        static final IntIntPair None = pair(0,0);</span>
+<span class="fc" id="L354">        static final IntIntPair One = pair(1,1);</span>
+<span class="fc" id="L355">        static final IntIntPair Two = pair(2,2);</span>
+
+<span class="fc" id="L357">        static final IntIntPair GTEZero = pair(0,-1);</span>
+<span class="fc" id="L358">        static final IntIntPair GTEOne = pair(1,-1);</span>
+<span class="fc" id="L359">        static final IntIntPair GTETwo = pair(2,-1);</span>
+
+    }
+
+<span class="fc" id="L363">    public static final int[] NALLevelEqualAndAbove = new int[8+1]; //indexed from 0..7, meaning index 7 is NAL8, index 0 is NAL1</span>
+    static {
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (Op o : Op.values()) {</span>
+<span class="fc" id="L366">            int l = o.minLevel;</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            if (l &lt; 0) l = 0; //count special ops as level 0, so they can be detected there</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            for (int i = l; i &lt;= 8; i++) {</span>
+<span class="fc" id="L369">                NALLevelEqualAndAbove[i] |= o.bit();</span>
+            }
+        }
+<span class="fc" id="L372">    }</span>
+
+
+    public static class InvalidPunctuationException extends RuntimeException {
+        public InvalidPunctuationException(char c) {
+<span class="nc" id="L377">            super(&quot;Invalid punctuation: &quot; + c);</span>
+<span class="nc" id="L378">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

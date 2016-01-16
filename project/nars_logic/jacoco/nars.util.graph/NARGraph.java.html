@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>NARGraph.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.graph</a> &gt; <span class="el_source">NARGraph.java</span></div><h1>NARGraph.java</h1><pre class="source lang-java linenums">package nars.util.graph;
+
+import nars.Global;
+import nars.NAR;
+import nars.concept.Concept;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jgrapht.EdgeFactory;
+import org.jgrapht.Graph;
+import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.DirectedMultigraph;
+
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Stores the contents of some, all, or of multiple NAR memory snapshots.
+ *
+ * @author me
+ */
+public class NARGraph&lt;V,E&gt; extends DirectedMultigraph&lt;V,E&gt; {
+
+    @NotNull
+    public &lt;X&gt; Set&lt;X&gt; vertices(@NotNull Class&lt;? extends X&gt; type) {
+<span class="nc" id="L26">        Set&lt;X&gt; s = Global.newHashSet(vertexSet().size());</span>
+<span class="nc" id="L27">        s.addAll(vertexSet().stream().filter(type::isInstance).map(o -&gt; (X) o).collect(Collectors.toList()));</span>
+<span class="nc" id="L28">        return s;</span>
+    }
+    
+    /**
+     * determines which NARS term can result in added graph features
+     */
+    public interface Filter {
+
+        boolean includeConcept(Concept c);
+    }
+
+<span class="nc" id="L39">    public static final Filter IncludeEverything = new Filter() {</span>
+
+        @Override
+        public boolean includeConcept(Concept c) {
+<span class="nc" id="L43">            return true;</span>
+        }
+    };
+
+    public static final class ExcludeBelowPriority implements Filter {
+
+        final float thresh;
+
+
+
+
+<span class="nc" id="L54">        public ExcludeBelowPriority(float l) {</span>
+<span class="nc" id="L55">            thresh = l;</span>
+<span class="nc" id="L56">        }</span>
+
+
+        @Override
+        public boolean includeConcept(Concept c) {
+<span class="nc" id="L61">            return true;</span>
+        }
+    }
+
+    /**
+     * creates graph features from NARS term
+     */
+    public interface Grapher {
+
+        @NotNull
+        Grapher on(NARGraph g, Object o);
+
+        /**
+         * called at beginning of operation
+         *
+         * @param g
+         * @param time
+         */
+        @Deprecated void onTime(NARGraph g, long time);
+
+
+        /**
+         * called at end of operation
+         *
+         */
+        void finish();
+
+        void setMinPriority(float minPriority);
+    }
+
+    public abstract static class NAREdge&lt;X&gt; extends DefaultEdge {
+
+        private final X object;
+        private final int hash;
+
+<span class="nc" id="L96">        protected NAREdge(X x) {</span>
+<span class="nc" id="L97">            object = x;</span>
+<span class="nc" id="L98">            hash = getHash();</span>
+<span class="nc" id="L99">        }</span>
+
+<span class="nc" id="L101">        protected NAREdge() {</span>
+<span class="nc" id="L102">            object = (X)getClass();</span>
+<span class="nc" id="L103">            hash = getHash();</span>
+<span class="nc" id="L104">        }</span>
+
+
+        public X name() {
+<span class="nc" id="L108">            return object;</span>
+        }
+
+        private int getHash() {
+<span class="nc" id="L112">            return Objects.hash(object.hashCode(), getSource(), getTarget());</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L117">            return hash;</span>
+        }
+
+        public X getObject() {
+<span class="nc" id="L121">            return object;</span>
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (obj == object) {</span>
+<span class="nc" id="L127">                return true;</span>
+            }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (obj instanceof NAREdge) {</span>
+<span class="nc" id="L130">                NAREdge e = (NAREdge) obj;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                return ((getSource() == e.getSource()) &amp;&amp; //need .equals?</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                        (getTarget() == e.getTarget()) &amp;&amp; //need .equals?</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                        (object.equals(((NAREdge) obj).object)));</span>
+            }
+<span class="nc" id="L135">            return false;</span>
+        }
+
+        @Override
+        public Object getSource() {
+<span class="nc" id="L140">            return super.getSource();</span>
+        }
+
+        @Override
+        public Object getTarget() {
+<span class="nc" id="L145">            return super.getTarget();</span>
+        }
+
+
+    }
+
+//    public static class TermBelief extends NAREdge {
+//
+//        @Override
+//        public String toString() {
+//            return &quot;belief&quot;;
+//        }
+//
+//        @Override
+//        public Object clone() {
+//            return super.clone();
+//        }
+//    }
+//
+//
+//    public static class TermQuestion extends NAREdge {
+//
+//        @Override
+//        public String toString() {
+//            return &quot;question&quot;;
+//        }
+//
+//        @Override
+//        public Object clone() {
+//            return super.clone();
+//        }
+//    }
+//
+//    public static class TermDerivation extends NAREdge {
+//
+//        @Override
+//        public String toString() {
+//            return &quot;derives&quot;;
+//        }
+//
+//        @Override
+//        public Object clone() {
+//            return super.clone();
+//        }
+//    }
+//
+//    public static class TermContent extends NAREdge {
+//
+//        @Override
+//        public String toString() {
+//            return &quot;has&quot;;
+//        }
+//
+//        @Override
+//        public Object clone() {
+//            return super.clone();
+//        }
+//    }
+//
+//    public static class TermType extends NAREdge {
+//
+//        @Override
+//        public String toString() {
+//            return &quot;type&quot;;
+//        }
+//
+//        @Override
+//        public Object clone() {
+//            return super.clone();
+//        }
+//    }
+//
+//    public static class SentenceContent extends NAREdge {
+//
+//        @Override
+//        public String toString() {
+//            return &quot;sentence&quot;;
+//        }
+//
+//        @Override
+//        public Object clone() {
+//            return super.clone();
+//        }
+//    }
+
+    public NARGraph() {
+<span class="nc" id="L231">        super(new MyEdgeFactory());</span>
+<span class="nc" id="L232">    }</span>
+
+
+    @NotNull
+    public NARGraph add(@NotNull NAR n, @NotNull Filter filter, @NotNull Grapher graphize) {
+<span class="nc" id="L237">        graphize.onTime(this, n.time());</span>
+
+        //TODO support AbstractBag
+<span class="nc" id="L240">        n.forEachConcept(c -&gt; {</span>
+
+            //graphize.preLevel(this, p);
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (!filter.includeConcept(c)) {</span>
+<span class="nc" id="L244">                return;</span>
+            }
+
+<span class="nc" id="L247">            graphize.on(this, c);</span>
+
+            //graphize.postLevel(this, level);
+<span class="nc" id="L250">        });</span>
+
+<span class="nc" id="L252">        graphize.finish();</span>
+<span class="nc" id="L253">        return this;</span>
+
+    }
+
+    @Override
+    public boolean addEdge(V sourceVertex, V targetVertex, @NotNull E e) {
+<span class="nc" id="L259">        return addEdge(sourceVertex, targetVertex, e, false);</span>
+    }
+
+    public boolean addEdge(V sourceVertex, V targetVertex, @NotNull E e, boolean allowMultiple) {
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (!allowMultiple) {</span>
+<span class="nc" id="L264">            Set&lt;E&gt; existing = getAllEdges(sourceVertex, targetVertex);</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            if (existing != null) {</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                for (Object o : existing) {</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                    if (o.getClass() == e.getClass()) {</span>
+<span class="nc" id="L268">                        return false;</span>
+                    }
+<span class="nc" id="L270">                }</span>
+            }
+        }
+
+<span class="nc" id="L274">        return super.addEdge(sourceVertex, targetVertex, e);</span>
+    }
+
+    //THESE REQUIRE JGRAPHX LIBRARY WHICH WE OTHERWISE DO NOT NEED IN NARS_CORE
+    //    public void toGraphML(Writer writer) throws SAXException, TransformerConfigurationException {
+    //        GraphMLExporter gme = new GraphMLExporter(new IntegerNameProvider(), new StringNameProvider(), new IntegerEdgeNameProvider(), new StringEdgeNameProvider());
+    //        gme.export(writer, this);
+    //    }
+    //
+    //    public void toGraphML(String outputFile) throws SAXException, TransformerConfigurationException, IOException {
+    //        toGraphML(new FileWriter(outputFile, false));
+    //    }
+    //
+    //    public void toGML(Writer writer) {
+    //        GmlExporter gme = new GmlExporter(new IntegerNameProvider(), new StringNameProvider(), new IntegerEdgeNameProvider(), new StringEdgeNameProvider());
+    //        gme.setPrintLabels(GmlExporter.PRINT_EDGE_VERTEX_LABELS);
+    //        gme.export(writer, this);
+    //    }
+    //
+    //    public void graphMLWrite(String filename) throws Exception {
+    //        new GraphMLExporter(new IntegerNameProvider(), new StringNameProvider(), new IntegerEdgeNameProvider(), new StringEdgeNameProvider()).export(new FileWriter(filename), this);
+    //    }
+    //
+    //    public void toGML(String outputFile) throws IOException {
+    //        toGML(new FileWriter(outputFile, false));
+    //    }
+
+    @NotNull
+    @Override
+    public Graph clone() {
+<span class="nc" id="L304">        return (Graph) super.clone();</span>
+    }
+
+
+
+    public static class TimeNode {
+
+        private final long time;
+
+<span class="nc" id="L313">        public TimeNode(long t) {</span>
+<span class="nc" id="L314">            time = t;</span>
+<span class="nc" id="L315">        }</span>
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L319">            return (int) time;</span>
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+<span class="nc bnc" id="L324" title="All 2 branches missed.">            if (!(obj instanceof TimeNode)) {</span>
+<span class="nc" id="L325">                return false;</span>
+            }
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            return ((TimeNode) obj).time == time;</span>
+        }
+
+        @NotNull
+        @Override
+        public String toString() {
+<span class="nc" id="L333">            return &quot;t&quot; + time;</span>
+        }
+
+    }
+
+    public static class UniqueEdge {
+
+        private final String label;
+
+<span class="nc" id="L342">        public UniqueEdge(String label) {</span>
+<span class="nc" id="L343">            this.label = label;</span>
+<span class="nc" id="L344">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L348">            return label;</span>
+        }
+
+    }
+
+    @Deprecated public void at(V x, long t) {
+<span class="nc" id="L354">        at(x, t, &quot;c&quot;); //c=creation time</span>
+<span class="nc" id="L355">    }</span>
+    @Deprecated public void at(V x, long t, String edgeLabel) {
+<span class="nc" id="L357">        at(x, t, (E) new UniqueEdge(edgeLabel));</span>
+<span class="nc" id="L358">    }</span>
+
+    @Deprecated public void at(V x, long t, @NotNull E edge) {
+<span class="nc" id="L361">        TimeNode timeNode = new TimeNode(t);</span>
+<span class="nc" id="L362">        addVertex((V) timeNode);</span>
+<span class="nc" id="L363">        addEdge((V) timeNode, x, edge);</span>
+<span class="nc" id="L364">    }</span>
+
+<span class="nc" id="L366">    private static class MyEdgeFactory implements EdgeFactory {</span>
+        @Nullable
+        @Override
+        public Object createEdge(Object sourceVertex, Object targetVertex) {
+<span class="nc" id="L370">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

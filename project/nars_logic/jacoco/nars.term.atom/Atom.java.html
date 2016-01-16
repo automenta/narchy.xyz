@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Atom.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.atom</a> &gt; <span class="el_source">Atom.java</span></div><h1>Atom.java</h1><pre class="source lang-java linenums">package nars.term.atom;
+
+import nars.Narsese;
+import nars.Op;
+import nars.term.Term;
+import nars.util.data.Util;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/** default Atom implementation */
+public class Atom extends StringAtom {
+
+<span class="fc" id="L13">    static final Atom[] digits = new Atom[10];</span>
+    //private static final Map&lt;String,Atom&gt; atoms = Global.newHashMap();
+
+
+//    public static int hash(byte[] id, int ordinal) {
+//        return Util.ELFHashNonZero(id, Util.PRIME1 * (1+ordinal));
+//        //return Util.WildPlasserHashNonZero(id, (1+ordinal));
+//    }
+
+    /** TODO use a hash function equivalent to String's but without allocating a String */
+    @Deprecated public static int hash(@NotNull byte[] id, int ordinal) {
+<span class="nc" id="L24">        return hash(new String(id).hashCode(), ordinal);</span>
+    }
+
+    public static int hash(@NotNull String id, @NotNull Op op) {
+<span class="nc" id="L28">        return hash(id.hashCode(), op);</span>
+    }
+
+    public static int hash(int id, @NotNull Op op) {
+<span class="nc" id="L32">        return hash(id, op.ordinal());</span>
+    }
+
+    public static int hash(int id, int ordinal) {
+        /* for Op.ATOM, we use String hashCode() as-is
+          avoiding need to calculate or store a
+          hash mutated by the Op (below) */
+<span class="nc bnc" id="L39" title="All 2 branches missed.">        if (ordinal == Op.ATOM.ordinal())</span>
+<span class="nc" id="L40">            return id;</span>
+
+<span class="nc" id="L42">        return Util.hashCombine(id, ordinal);</span>
+    }
+
+    public Atom(@NotNull byte[] n) {
+<span class="fc" id="L46">        super( new String(n) );</span>
+<span class="fc" id="L47">    }</span>
+
+    public Atom(String n) {
+<span class="fc" id="L50">        super(n);//Utf8.toUtf8(n)</span>
+<span class="fc" id="L51">    }</span>
+
+
+
+//    /**
+//     * Constructor with a given name
+//     *
+//     * @param id A String as the name of the Term
+//     */
+//    public Atom(final String id) {
+//        super(id);
+//    }
+//
+//    public Atom(final byte[] id) {
+//        super(id);
+//    }
+
+    //    /**
+//     * Default constructor that build an internal Term
+//     */
+//    @Deprecated protected Atom() {
+//    }
+
+    /** Creates a quote-escaped term from a string. Useful for an atomic term that is meant to contain a message as its name */
+    @NotNull
+    public static Atom quote(String t) {
+<span class="fc" id="L77">        return Atom.the('&quot;' + t + '&quot;');</span>
+    }
+
+    /** determines if the string is invalid as an unquoted term according to the characters present */
+    public static boolean quoteNecessary(@NotNull CharSequence t) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (int i = 0; i &lt; t.length(); i++) {</span>
+<span class="fc" id="L83">            char c = t.charAt(i);</span>
+//            if (Character.isWhitespace(c)) return true;
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (!Narsese.isValidAtomChar(c))</span>
+<span class="fc" id="L86">                return true;</span>
+//            if ((!Character.isDigit(c)) &amp;&amp; (!Character.isAlphabetic(c))) return true;
+        }
+<span class="fc" id="L89">        return false;</span>
+    }
+
+//    /** interns the atomic term given a name, storing it in the static symbol table */
+//    public final static Atom theCached(final String name) {
+//        return atoms.computeIfAbsent(name, AtomInterner);
+//    }
+
+    @NotNull
+    public static Atom the(@NotNull String name, boolean quoteIfNecessary) {
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (quoteIfNecessary &amp;&amp; quoteNecessary(name))</span>
+<span class="fc" id="L100">            return quote(name);</span>
+
+<span class="fc" id="L102">        return the(name);</span>
+    }
+
+    public static Term the(Term x) {
+<span class="nc" id="L106">        return x;</span>
+    }
+
+    public static Atom the(Number o) {
+
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (o instanceof Byte) return the(o.intValue());</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (o instanceof Short) return the(o.intValue());</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (o instanceof Integer) return the(o.intValue());</span>
+
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (o instanceof Long) return the(Long.toString((long)o));</span>
+
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        if ((o instanceof Float) || (o instanceof Double)) return the(o.floatValue());</span>
+
+<span class="nc" id="L119">        return the(o.toString(), true);</span>
+    }
+
+    /** gets the atomic term of an integer */
+    public static Atom the(int i) {
+<span class="fc" id="L124">        return the(i, 10);</span>
+    }
+
+    /** gets the atomic term of an integer, with specific radix (up to 36) */
+    public static Atom the(int i, int radix) {
+        //fast lookup for single digits
+<span class="fc bfc" id="L130" title="All 4 branches covered.">        if ((i &gt;= 0) &amp;&amp; (i &lt;= 9)) {</span>
+<span class="fc" id="L131">            Atom a = digits[i];</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (a == null)</span>
+<span class="fc" id="L133">                a = digits[i] = the(Integer.toString(i, radix));</span>
+<span class="fc" id="L134">            return a;</span>
+        }
+<span class="fc" id="L136">        return the(Integer.toString(i, radix));</span>
+    }
+
+    public static Atom the(float v) {
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (Util.equal( (float)Math.floor(v), v, Float.MIN_VALUE*2 )) {</span>
+            //close enough to be an int, so it doesnt need to be quoted
+<span class="fc" id="L142">            return the((int)v);</span>
+        }
+<span class="fc" id="L144">        return the(Float.toString(v));</span>
+    }
+
+    /** gets the atomic term given a name */
+    @NotNull
+    public static Atom the(String name) {
+        //return Atom.the(Utf8.toUtf8(name));
+<span class="fc" id="L151">        return new Atom(name);</span>
+
+//        int olen = name.length();
+//        switch (olen) {
+//            case 0:
+//                throw new RuntimeException(&quot;empty atom name: &quot; + name);
+//
+////            //re-use short term names
+////            case 1:
+////            case 2:
+////                return theCached(name);
+//
+//            default:
+//                if (olen &gt; Short.MAX_VALUE/2)
+//                    throw new RuntimeException(&quot;atom name too long&quot;);
+
+      //  }
+    }
+
+    @NotNull
+    public static Atom the(@NotNull byte[] id) {
+<span class="fc" id="L172">        return new Atom(id);</span>
+    }
+
+
+    @NotNull
+    public static Atom the(byte c) {
+<span class="fc" id="L178">        return Atom.the(new byte[] { c });</span>
+    }
+
+    @NotNull
+    public static String unquote(@NotNull Term s) {
+<span class="nc" id="L183">        return toUnquoted(s.toString());</span>
+    }
+
+    @NotNull
+    public static String toUnquoted(@NotNull String x) {
+<span class="fc" id="L188">        int len = x.length();</span>
+<span class="pc bpc" id="L189" title="2 of 6 branches missed.">        if (len &gt; 0 &amp;&amp; x.charAt(0) == '\&quot;' &amp;&amp; x.charAt(len - 1) == '\&quot;') {</span>
+<span class="fc" id="L190">            return x.substring(1, len - 1);</span>
+        }
+<span class="fc" id="L192">        return x;</span>
+    }
+
+    /*
+    // similar to String.intern()
+    public final static Atom the(final String name) {
+        if (name.length() &lt;= 2)
+            return theCached(name);
+        return new Atom(name);
+    }
+    */
+
+    @Nullable
+    public static Term the(Object o) {
+
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (o instanceof Term) return ((Term)o);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (o instanceof String)</span>
+<span class="nc" id="L209">            return the((String)o);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (o instanceof Number)</span>
+<span class="nc" id="L211">            return the((Number)o);</span>
+<span class="nc" id="L212">        return null;</span>
+    }
+
+<span class="fc" id="L215">    static final int AtomBit = Op.ATOM.bit();</span>
+
+    @Override
+    public final int structure() {
+<span class="fc" id="L219">        return AtomBit;</span>
+    }
+
+    @NotNull
+    public final String toStringUnquoted() {
+<span class="fc" id="L224">        return toUnquoted(toString());</span>
+    }
+
+
+    /** performs a thorough check of the validity of a term (by cloneDeep it) to see if it's valid */
+//    public static boolean valid(final Term content) {
+//
+//        return true;
+////        try {
+////            Term cloned = content.cloneDeep();
+////            return cloned!=null;
+////        }
+////        catch (Throwable e) {
+////            if (Global.DEBUG &amp;&amp; Global.DEBUG_INVALID_SENTENCES) {
+////                System.err.println(&quot;INVALID TERM: &quot; + content);
+////                e.printStackTrace();
+////            }
+////            return false;
+////        }
+////
+//    }
+}
+
+
+//    @Override
+//    public boolean hasVar(Op type) {
+//        return false;
+//    }
+
+//    /**
+//     * Equal terms have identical name, though not necessarily the same
+//     * reference.
+//     *
+//     * @return Whether the two Terms are equal
+//     * @param that The Term to be compared with the current Term
+//     */
+//    @Override
+//    public boolean equals(final Object that) {
+//        if (this == that) return true;
+//        if (!(that instanceof Atom)) return false;
+//        final Atom t = (Atom)that;
+//        return equalID(t);
+//
+////        if (equalsType(t) &amp;&amp; equalsName(t)) {
+////            t.name = name; //share
+////            return true;
+////        }
+////        return false;
+//    }
+
+
+//    public final void recurseSubtermsContainingVariables(final TermVisitor v) {
+//        recurseSubtermsContainingVariables(v, null);
+//    }
+
+//    /**
+//     * Recursively check if a compound contains a term
+//     *
+//     * @param target The term to be searched
+//     * @return Whether the two have the same content
+//     */
+//    @Override public final void recurseSubtermsContainingVariables(final TermVisitor v, Term parent) {
+//        //TODO move to Variable subclass and leave this empty here
+//        if (hasVar())
+//            v.visit(this, parent);
+//    }
+
+//    final public byte byt(int n) {
+//        return data[n];
+//    }
+
+//    final byte byt0() {
+//        return data[0];
+//    }
+
+//    @Override
+//    public final boolean equalsOrContainsTermRecursively(final Term target) {
+//        return equals(target);
+//   }
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

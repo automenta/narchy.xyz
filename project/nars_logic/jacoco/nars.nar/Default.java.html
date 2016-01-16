@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Default.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nar</a> &gt; <span class="el_source">Default.java</span></div><h1>Default.java</h1><pre class="source lang-java linenums">package nars.nar;
+
+import com.gs.collections.impl.bag.mutable.HashBag;
+import nars.Global;
+import nars.Memory;
+import nars.NAR;
+import nars.bag.BLink;
+import nars.bag.Bag;
+import nars.bag.impl.CurveBag;
+import nars.budget.Budget;
+import nars.budget.BudgetMerge;
+import nars.concept.Concept;
+import nars.concept.ConceptProcess;
+import nars.data.Range;
+import nars.nal.Deriver;
+import nars.nal.meta.PremiseMatch;
+import nars.nar.experimental.Derivelet;
+import nars.task.Task;
+import nars.task.flow.SetTaskPerception;
+import nars.task.flow.TaskPerception;
+import nars.term.TermIndex;
+import nars.term.Termed;
+import nars.time.FrameClock;
+import nars.util.data.MutableInteger;
+import nars.util.data.list.FasterList;
+import nars.util.event.Active;
+import org.apache.commons.lang3.mutable.MutableFloat;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+import static java.util.stream.Collectors.toList;
+
+/**
+ * Various extensions enabled
+ */
+public class Default extends AbstractNAR {
+
+    @NotNull
+    public final AbstractCycle core;
+    @NotNull
+    public final TaskPerception input;
+
+
+    @Deprecated
+    public Default() {
+<span class="fc" id="L51">        this(1024, 1, 1, 3);</span>
+<span class="fc" id="L52">    }</span>
+
+    public Default(int numConcepts,
+                   int conceptsFirePerCycle,
+                   int tasklinkFirePerConcept,
+                   int termlinkFirePerConcept) {
+<span class="fc" id="L58">        this(new Memory(new FrameClock(),</span>
+                //TermIndex.memoryWeak(numConcepts * 2)
+<span class="fc" id="L60">                TermIndex.memory(numConcepts * 2)</span>
+
+        ), numConcepts, conceptsFirePerCycle, termlinkFirePerConcept, tasklinkFirePerConcept);
+<span class="fc" id="L63">    }</span>
+
+    public Default(@NotNull Memory mem, int activeConcepts, int conceptsFirePerCycle, int termLinksPerConcept, int taskLinksPerConcept) {
+<span class="fc" id="L66">        super(mem);</span>
+
+<span class="fc" id="L68">        the(&quot;input&quot;, input = initInput());</span>
+
+<span class="fc" id="L70">        the(&quot;core&quot;, core = initCore(</span>
+                activeConcepts,
+                conceptsFirePerCycle,
+                termLinksPerConcept, taskLinksPerConcept
+        ));
+
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (core!=null) {</span>
+<span class="fc" id="L77">            beforeNextFrame(this::initHigherNAL);</span>
+        }
+
+
+        //new QueryVariableExhaustiveResults(this.memory());
+
+        /*
+        the(&quot;memory_sharpen&quot;, new BagForgettingEnhancer(memory, core.active));
+        */
+
+<span class="fc" id="L87">    }</span>
+
+//    public TaskPerception _initInput() {
+//        return new FIFOTaskPerception(this, null, this::process);
+//    }
+
+    @NotNull
+    public TaskPerception initInput() {
+
+<span class="fc" id="L96">        return new SetTaskPerception(</span>
+                memory, this::process, BudgetMerge.plusDQDominated);
+
+        /* {
+            @Override
+            protected void onOverflow(Task t) {
+                memory.eventError.emit(&quot;Overflow: &quot; + t + &quot; &quot; + getStatistics());
+            }
+        };*/
+        //input.inputsMaxPerCycle.set(conceptsFirePerCycle);;
+    }
+
+    @NotNull
+    protected AbstractCycle initCore(int activeConcepts, int conceptsFirePerCycle, int termLinksPerConcept, int taskLinksPerConcept) {
+
+<span class="fc" id="L111">        DefaultCycle c = new DefaultCycle(this, newDeriver(), newConceptBag(activeConcepts));</span>
+
+        //TODO move these to a PremiseGenerator which supplies
+        // batches of Premises
+<span class="fc" id="L115">        c.termlinksFiredPerFiredConcept.set(termLinksPerConcept);</span>
+<span class="fc" id="L116">        c.tasklinksFiredPerFiredConcept.set(taskLinksPerConcept);</span>
+
+<span class="fc" id="L118">        c.conceptsFiredPerCycle.set(conceptsFirePerCycle);</span>
+
+<span class="fc" id="L120">        c.capacity.set(activeConcepts);</span>
+
+<span class="fc" id="L122">        c.deriveConfMin.setValue(4f * Global.TRUTH_EPSILON);</span>
+
+<span class="fc" id="L124">        return c;</span>
+    }
+
+    @NotNull
+    public Bag&lt;Concept&gt; newConceptBag(int initialCapacity) {
+<span class="fc" id="L129">        return new CurveBag&lt;Concept&gt;(initialCapacity, rng).mergePlus();</span>
+    }
+
+//    public Bag&lt;Concept&gt; newConceptBagAggregateLinks(int initialCapacity) {
+//        return new CurveBag&lt;Concept&gt;(initialCapacity, rng) {
+//
+//            @Override public BLink&lt;Concept&gt; put(Object v) {
+//                BLink&lt;Concept&gt; b = get(v);
+//                Concept c = (Concept) v;
+//                if (b==null)
+//                    b = new BLink(c, 0,1,1);
+//
+//                c.getTaskLinks().commit();
+//                c.getTermLinks().commit();
+//
+//                float p =
+//                        //Math.max(
+//                        //c.getTaskLinks().getSummarySum()/taskLinkBagSize
+//                        //(
+//                        //c.getTaskLinks().getSummaryMean()
+//                        //+c.getTermLinks().getSummaryMean()) * 0.5f
+//                        c.getTaskLinks().getPriorityMax()
+//
+//                        // c.getTermLinks().getPriorityMax()
+//
+//                        //)
+//                        ;
+//
+//                b.budget(p, 1f, 1f);
+//
+//                return put(c, b);
+//            }
+//
+//        }.mergeNull();
+//    }
+
+
+    @Override public float conceptPriority(Termed termed, float priIfNonExistent) {
+<span class="fc" id="L167">        BLink&lt;Concept&gt; c = core.active.get(termed);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (c!=null)</span>
+<span class="fc" id="L169">            return c.getPriority();</span>
+<span class="fc" id="L170">        return priIfNonExistent;</span>
+    }
+
+    @Override
+    public Concept conceptualize(Termed termed, Budget activation, float scale) {
+<span class="fc" id="L175">        Concept c = concept(termed);</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (c!=null) {</span>
+<span class="fc" id="L177">            core.activate(c, activation, scale);</span>
+        }
+<span class="fc" id="L179">        return c;</span>
+    }
+
+    @NotNull
+    @Override
+    public NAR forEachConcept(Consumer&lt;Concept&gt; recip) {
+<span class="fc" id="L185">        core.active.forEachKey(recip);</span>
+<span class="fc" id="L186">        return this;</span>
+    }
+
+
+<span class="fc" id="L190">    public static final Predicate&lt;BLink&lt;?&gt;&gt; simpleForgetDecay = (b) -&gt; {</span>
+<span class="nc" id="L191">        float p = b.getPriority() * 0.95f;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (p &gt; b.getQuality()*0.1f)</span>
+<span class="nc" id="L193">            b.setPriority(p);</span>
+<span class="nc" id="L194">        return true;</span>
+    };
+
+    /**
+     * The original deterministic memory cycle implementation that is currently used as a standard
+     * for development and testing.
+     */
+    public abstract static class AbstractCycle implements Consumer&lt;BLink&lt;Concept&gt;&gt; {
+
+        @NotNull
+        final Active handlers;
+
+        public final Deriver  der;
+
+        /**
+         * How many concepts to fire each cycle; measures degree of parallelism in each cycle
+         */
+        @NotNull
+        @Range(min=0,max=64,unit=&quot;Concept&quot;)
+        public final MutableInteger conceptsFiredPerCycle;
+
+<span class="fc" id="L215">        @Range(min=0,max=16,unit=&quot;TaskLink&quot;) //TODO use float percentage</span>
+        public final MutableInteger tasklinksFiredPerFiredConcept = new MutableInteger(1);
+
+<span class="fc" id="L218">        @Range(min=0,max=16,unit=&quot;TermLink&quot;)</span>
+        public final MutableInteger termlinksFiredPerFiredConcept = new MutableInteger(1);
+
+<span class="fc" id="L221">        @Range(min=0.0f,max=1.0,unit=&quot;Percent&quot;)</span>
+        public final MutableFloat conceptActivation = new MutableFloat(1);
+
+        @Range(min=0.01f,max=8,unit=&quot;Duration&quot;)
+        public final MutableFloat conceptRemembering;
+
+        @Range(min=0.01f,max=8,unit=&quot;Duration&quot;)
+        public final MutableFloat linkRemembering;
+
+        //public final MutableFloat activationFactor = new MutableFloat(1.0f);
+
+//        final Function&lt;Task, Task&gt; derivationPostProcess = d -&gt; {
+//            return LimitDerivationPriority.limitDerivation(d);
+//        };
+
+
+
+        /**
+         * concepts active in this cycle
+         */
+        public final Bag&lt;Concept&gt; active;
+
+        @NotNull
+        @Deprecated
+        public final transient NAR nar;
+
+<span class="fc" id="L247">        @Range(min=0,max=8192,unit=&quot;Concept&quot;)</span>
+        public final MutableInteger capacity = new MutableInteger();
+
+        /** activated concepts pending (re-)insert to bag */
+<span class="fc" id="L251">        public final LinkedHashSet&lt;Concept&gt; activated = new LinkedHashSet();</span>
+
+<span class="fc" id="L253">        final Derivelet deriver = new Derivelet();</span>
+
+        @NotNull
+        @Range(min=0, max=1f,unit=&quot;Perfection&quot;)
+        public final MutableFloat perfection;
+
+<span class="fc" id="L259">        final List&lt;BLink&lt;Concept&gt;&gt; firing = Global.newArrayList(1);</span>
+
+        @NotNull
+        private final AlannForget&lt;Task&gt; taskLinkForget;
+        @NotNull
+        private final AlannForget&lt;Termed&gt; termLinkForget;
+        @NotNull
+        private final AlannForget&lt;Concept&gt; conceptForget;
+
+        //cached
+        private transient int termlnksToFire, tasklinksToFire;
+
+//        @Deprecated
+//        int tasklinks = 2; //TODO use MutableInteger for this
+//        @Deprecated
+//        int termlinks = 3; //TODO use MutableInteger for this
+
+        /* ---------- Short-term workspace for a single cycle ------- */
+
+<span class="fc" id="L278">        protected AbstractCycle(@NotNull NAR nar, Deriver deriver, Bag&lt;Concept&gt; concepts) {</span>
+
+<span class="fc" id="L280">            this.nar = nar;</span>
+
+<span class="fc" id="L282">            this.der = deriver;</span>
+
+
+<span class="fc" id="L285">            Memory m = nar.memory;</span>
+
+<span class="fc" id="L287">            this.conceptRemembering = m.conceptForgetDurations;</span>
+<span class="fc" id="L288">            this.linkRemembering = m.linkForgetDurations;</span>
+<span class="fc" id="L289">            this.perfection = m.perfection;</span>
+
+<span class="fc" id="L291">            conceptsFiredPerCycle = new MutableInteger(1);</span>
+<span class="fc" id="L292">            active = concepts;</span>
+
+<span class="fc" id="L294">            this.handlers = new Active(</span>
+<span class="fc" id="L295">                m.eventCycleEnd.on(this::onCycle),</span>
+<span class="fc" id="L296">                m.eventReset.on((mem) -&gt; onReset())</span>
+            );
+
+<span class="fc" id="L299">            taskLinkForget = new AlannForget(nar, m.linkForgetDurations, perfection);</span>
+<span class="fc" id="L300">            termLinkForget = new AlannForget(nar, m.linkForgetDurations, perfection);</span>
+<span class="fc" id="L301">            conceptForget = new AlannForget(nar, m.conceptForgetDurations, perfection);</span>
+<span class="fc" id="L302">        }</span>
+
+        protected void onCycle(Memory memory) {
+<span class="fc" id="L305">            forgetConcepts();</span>
+<span class="fc" id="L306">            fireConcepts(conceptsFiredPerCycle.intValue());</span>
+<span class="fc" id="L307">            updateActivated();</span>
+<span class="fc" id="L308">        }</span>
+
+        private void forgetConcepts() {
+<span class="fc" id="L311">            active.top(conceptForget); //TODO use downsampling % of concepts not TOP</span>
+<span class="fc" id="L312">        }</span>
+
+        private void updateActivated() {
+<span class="fc" id="L315">            active.commit();</span>
+
+            //active.printAll();
+
+<span class="fc" id="L319">            LinkedHashSet&lt;Concept&gt; a = this.activated;</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (!a.isEmpty()) {</span>
+<span class="nc" id="L321">                a.forEach(active::put);</span>
+<span class="nc" id="L322">                a.clear();</span>
+            }
+<span class="fc" id="L324">        }</span>
+
+        /** processes derivation result */
+        protected abstract void process(ConceptProcess cp);
+
+        /**
+         * samples an active concept
+         */
+        public final Concept next() {
+<span class="fc" id="L333">            return active.sample().get();</span>
+        }
+
+
+        private void onReset() {
+<span class="fc" id="L338">            active.clear();</span>
+<span class="fc" id="L339">            activated.clear();</span>
+<span class="fc" id="L340">        }</span>
+
+
+        protected final void fireConcepts(int conceptsToFire) {
+
+<span class="fc" id="L345">            Bag&lt;Concept&gt; b = this.active;</span>
+
+<span class="fc" id="L347">            b.setCapacity(capacity.intValue()); //TODO share the MutableInteger so that this doesnt need to be called ever</span>
+<span class="fc bfc" id="L348" title="All 4 branches covered.">            if (conceptsToFire == 0 || b.isEmpty()) return;</span>
+
+<span class="fc" id="L350">            List&lt;BLink&lt;Concept&gt;&gt; f = this.firing;</span>
+<span class="fc" id="L351">            b.sample(conceptsToFire, f);</span>
+
+<span class="fc" id="L353">            tasklinksToFire = tasklinksFiredPerFiredConcept.intValue();</span>
+<span class="fc" id="L354">            termlnksToFire = termlinksFiredPerFiredConcept.intValue();</span>
+
+<span class="fc" id="L356">            f.forEach(this);</span>
+<span class="fc" id="L357">            f.clear();</span>
+
+<span class="fc" id="L359">        }</span>
+
+        public final void activate(Concept c, Budget b, float scale) {
+<span class="fc" id="L362">            active.put(c, b, scale * conceptActivation.floatValue());</span>
+<span class="fc" id="L363">        }</span>
+
+        /** fires a concept selected by the bag */
+        @Override public final void accept(@NotNull BLink&lt;Concept&gt; cb) {
+
+            //c.getTermLinks().up(simpleForgetDecay);
+            //c.getTaskLinks().update(simpleForgetDecay);
+
+<span class="fc" id="L371">            deriver.firePremiseSquare(nar, this::process, cb,</span>
+                tasklinksToFire,
+                termlnksToFire,
+                //simpleForgetDecay
+                termLinkForget,
+                taskLinkForget
+            );
+
+            //activate(c);
+<span class="fc" id="L380">        }</span>
+
+        final static class AlannForget&lt;X&gt; implements Consumer&lt;BLink&lt;X&gt;&gt;, Predicate&lt;BLink&lt;X&gt;&gt; {
+
+            private final MutableFloat forgetTime;
+            private final MutableFloat perfection;
+
+            //cached
+<span class="fc" id="L388">            private transient float forgetTimeCached = Float.NaN;</span>
+<span class="fc" id="L389">            private transient float perfectionCached = Float.NaN;</span>
+<span class="fc" id="L390">            private transient long now = -1;</span>
+
+<span class="fc" id="L392">            public AlannForget(@NotNull NAR nar, MutableFloat forgetTime, MutableFloat perfection) {</span>
+<span class="fc" id="L393">                this.forgetTime = forgetTime;</span>
+<span class="fc" id="L394">                this.perfection = perfection;</span>
+<span class="fc" id="L395">                nar.onEachCycle(this::accept);</span>
+<span class="fc" id="L396">                accept(nar.memory);</span>
+<span class="fc" id="L397">            }</span>
+
+            @Override
+            public void accept(@NotNull BLink budget) {
+                // priority * e^(-lambda*t)
+                //     lambda is (1 - durabilty) / forgetPeriod
+                //     dt is the delta
+<span class="fc" id="L404">                final long currentTime = now;</span>
+
+<span class="fc" id="L406">                long dt = budget.setLastForgetTime(currentTime);</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">                if (dt == 0) return ; //too soon to update</span>
+
+<span class="fc" id="L409">                float currentPriority = budget.getPriorityIfNaNThenZero();</span>
+
+<span class="fc" id="L411">                float relativeThreshold = perfectionCached;</span>
+
+<span class="fc" id="L413">                float expDecayed = currentPriority * (float) Math.exp(</span>
+<span class="fc" id="L414">                        -((1.0f - budget.getDurability()) / forgetTimeCached) * dt</span>
+                );
+<span class="fc" id="L416">                float threshold = budget.getQuality() * relativeThreshold;</span>
+
+<span class="fc" id="L418">                float nextPriority = expDecayed;</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">                if (nextPriority &lt; threshold) nextPriority = threshold;</span>
+
+<span class="fc" id="L421">                budget.setPriority(nextPriority);</span>
+
+<span class="fc" id="L423">            }</span>
+
+
+            public void accept(@NotNull Memory memory) {
+                //same for duration of the cycle
+<span class="fc" id="L428">                forgetTimeCached = forgetTime.floatValue() * memory.duration();</span>
+<span class="fc" id="L429">                perfectionCached = perfection.floatValue();</span>
+<span class="fc" id="L430">                now = memory.time();</span>
+<span class="fc" id="L431">            }</span>
+
+            @Override
+            public boolean test(@NotNull BLink bLink) {
+<span class="fc" id="L435">                accept(bLink);</span>
+<span class="fc" id="L436">                return true;</span>
+            }
+        }
+
+        //try to implement some other way, this is here because of serializability
+
+    }
+
+
+    /**
+     * groups each derivation's tasks as a group before inputting into
+     * the main perception buffer, allowing post-processing such as budget normalization.
+     * &lt;p&gt;
+     * ex: this can ensure that a premise which produces many derived tasks
+     * will not consume budget unfairly relative to another premise
+     * with less tasks but equal budget.
+     */
+    public static class DefaultCycle extends AbstractCycle {
+
+        /** derived tasks with truth confidence lower than this value are discarded. */
+<span class="fc" id="L456">        @Range(min=0, max=1f)</span>
+        public final MutableFloat deriveConfMin = new MutableFloat(Global.TRUTH_EPSILON);
+
+        /**
+         * re-used, not to be used outside of this
+         */
+        @NotNull
+        private final PremiseMatch matcher;
+
+        /**
+         * holds the resulting tasks of one derivation so they can
+         * be normalized or some other filter or aggregation
+         * applied collectively.
+         */
+        @NotNull
+        final Collection&lt;Task&gt; derivedTasksBuffer;
+
+
+
+        public DefaultCycle(@NotNull NAR nar, Deriver deriver, Bag&lt;Concept&gt; concepts) {
+<span class="fc" id="L476">            super(nar, deriver, concepts);</span>
+
+<span class="fc" id="L478">            matcher = new PremiseMatch(nar.memory.random);</span>
+            /* if detecting duplicates, use a list. otherwise use a set to deduplicate anyway */
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            derivedTasksBuffer =</span>
+                    Global.DEBUG_DETECT_DUPLICATE_DERIVATIONS ?
+<span class="pc" id="L482">                            new FasterList() : Global.newHashSet(1);</span>
+
+<span class="fc" id="L484">        }</span>
+
+        @Override protected void onCycle(Memory memory) {
+<span class="fc" id="L487">            matcher.setMinConfidence(deriveConfMin.floatValue());</span>
+<span class="fc" id="L488">            super.onCycle(memory);</span>
+<span class="fc" id="L489">        }</span>
+
+        @Override
+        public void process(@NotNull ConceptProcess p) {
+<span class="fc" id="L493">            Collection&lt;Task&gt; buffer = derivedTasksBuffer;</span>
+
+<span class="fc" id="L495">            this.der.run(p, matcher, buffer::add);</span>
+
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">            if (Global.DEBUG_DETECT_DUPLICATE_DERIVATIONS) {</span>
+<span class="nc" id="L498">                HashBag&lt;Task&gt; b = detectDuplicates(buffer);</span>
+<span class="nc" id="L499">                buffer.clear();</span>
+<span class="nc" id="L500">                b.addAll(buffer);</span>
+            }
+
+<span class="fc bfc" id="L503" title="All 2 branches covered.">            if (!buffer.isEmpty()) {</span>
+<span class="fc" id="L504">                Task.inputNormalized( buffer,</span>
+                        //p.getMeanPriority()
+<span class="fc" id="L506">                        p.getTask().getPriority()</span>
+
+                        //p.getTask().getPriority() * 1f/buffer.size()
+                        //p.getTask().getPriority()/buffer.size()
+                        //p.taskLink.getPriority()
+                        //p.getTaskLink().getPriority()/buffer.size()
+
+                        //p.conceptLink.getPriority()
+                        //UtilityFunctions.or(p.conceptLink.getPriority(), p.taskLink.getPriority())
+
+                ,nar::input);
+<span class="fc" id="L517">                buffer.clear();</span>
+            }
+
+<span class="fc" id="L520">        }</span>
+
+        @NotNull
+        static HashBag&lt;Task&gt; detectDuplicates(@NotNull Collection&lt;Task&gt; buffer) {
+<span class="nc" id="L524">            HashBag&lt;Task&gt; taskCount = new HashBag&lt;&gt;();</span>
+<span class="nc" id="L525">            taskCount.addAll(buffer);</span>
+<span class="nc" id="L526">            taskCount.forEachWithOccurrences((t, i) -&gt; {</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                if (i == 1) return;</span>
+
+<span class="nc" id="L529">                System.err.println(&quot;DUPLICATE TASK(&quot; + i + &quot;): &quot; + t);</span>
+<span class="nc" id="L530">                List&lt;Task&gt; equiv = buffer.stream().filter(u -&gt; u.equals(t)).collect(toList());</span>
+<span class="nc" id="L531">                HashBag&lt;String&gt; rules = new HashBag();</span>
+<span class="nc" id="L532">                equiv.forEach(u -&gt; {</span>
+<span class="nc" id="L533">                    String rule = u.getLogLast().toString();</span>
+<span class="nc" id="L534">                    rules.add(rule);</span>
+
+//                    System.err.println(&quot;\t&quot; + u );
+//                    System.err.println(&quot;\t\t&quot; + rule );
+//                    System.err.println();
+<span class="nc" id="L539">                });</span>
+<span class="nc" id="L540">                rules.forEachWithOccurrences((String r, int c) -&gt; System.err.println(&quot;\t&quot; + c + '\t' + r));</span>
+<span class="nc" id="L541">                System.err.println(&quot;--&quot;);</span>
+
+<span class="nc" id="L543">            });</span>
+<span class="nc" id="L544">            return taskCount;</span>
+        }
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

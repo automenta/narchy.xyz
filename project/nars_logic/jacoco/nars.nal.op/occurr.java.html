@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>occurr.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.op</a> &gt; <span class="el_source">occurr.java</span></div><h1>occurr.java</h1><pre class="source lang-java linenums">package nars.nal.op;
+
+
+import nars.concept.ConceptProcess;
+import nars.nal.Tense;
+import nars.nal.meta.AtomicBooleanCondition;
+import nars.nal.meta.PremiseMatch;
+import nars.term.Term;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * occurrsRelative(target, variable, direction)
+ * target: pass through
+ * direction= +1, -1, 0
+ * variable: term to modify occurrence relative to
+ */
+public class occurr extends AtomicBooleanCondition&lt;PremiseMatch&gt; {
+
+    final boolean taskOrBelief, forward;
+    @NotNull
+    final String str;
+
+<span class="fc" id="L24">    public occurr(@NotNull Term var1, @NotNull Term var2) {</span>
+<span class="fc" id="L25">        taskOrBelief = var1.toString().equals(&quot;task&quot;); //TODO check else case</span>
+<span class="fc" id="L26">        forward = var2.toString().equals(&quot;forward&quot;); //TODO check else case</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        str = getClass().getSimpleName() + &quot;:(&quot; +</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">                (taskOrBelief ? &quot;task&quot; : &quot;belief&quot;) + &quot;,&quot; +</span>
+<span class="fc" id="L29">                (forward ? &quot;forward&quot; : &quot;reverse&quot;) + &quot;)&quot;;</span>
+<span class="fc" id="L30">    }</span>
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="fc" id="L35">        return str;</span>
+    }
+
+    @Override
+    public boolean booleanValueOf(@NotNull PremiseMatch m) {
+
+<span class="fc" id="L41">        ConceptProcess p = m.premise;</span>
+
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        Term tt = taskOrBelief ? p.getTaskTerm() :</span>
+<span class="fc" id="L44">                p.getBeliefTerm().term();</span>
+                //p.getBelief()!=null ? p.getBelief().term() : null;
+
+
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (tt != null &amp;&amp; (tt instanceof Compound)) {</span>
+<span class="fc" id="L49">            int t = ((Compound)tt).t();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (t != Tense.ITERNAL) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                if (!forward) t = -t;</span>
+
+<span class="fc" id="L53">                m.occDelta.set(t);</span>
+<span class="fc" id="L54">                return true;</span>
+            }
+        }
+
+<span class="fc" id="L58">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

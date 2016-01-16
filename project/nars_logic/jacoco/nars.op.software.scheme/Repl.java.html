@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Repl.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.op.software.scheme</a> &gt; <span class="el_source">Repl.java</span></div><h1>Repl.java</h1><pre class="source lang-java linenums">package nars.op.software.scheme;
+
+
+import nars.op.software.scheme.expressions.Expression;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.*;
+import java.util.stream.IntStream;
+
+
+<span class="pc" id="L11">public enum Repl {</span>
+    ;
+<span class="fc" id="L13">    public static final SchemeClosure ENV = DefaultEnvironment.newInstance();</span>
+<span class="fc" id="L14">    public static final PrintStream OUTPUT_STREAM = System.out;</span>
+<span class="fc" id="L15">    public static final InputStream INPUT_STREAM = System.in;</span>
+
+    public static void main(String[] args) {
+<span class="nc" id="L18">        repl(INPUT_STREAM, OUTPUT_STREAM);</span>
+<span class="nc" id="L19">    }</span>
+
+    private static void repl(@NotNull InputStream in, @NotNull PrintStream out) {
+<span class="nc" id="L22">        repl(in, out, ENV);</span>
+<span class="nc" id="L23">    }</span>
+
+    public static void repl(@NotNull InputStream in, @NotNull PrintStream out, SchemeClosure env) {
+<span class="nc" id="L26">        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(in));</span>
+
+<span class="nc" id="L28">        String input = &quot;&quot;;</span>
+
+        while (true) {
+<span class="nc" id="L31">            prompt(out, Reader.countOpenParens(input));</span>
+
+            try {
+<span class="nc" id="L34">                String l = readLine(bufferedReader);</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">                if (l == null) break;</span>
+<span class="nc" id="L36">                input += l;</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">                if (completeExpression(input)) {</span>
+<span class="nc" id="L38">                    Reader.read(input).stream()</span>
+<span class="nc" id="L39">                            .forEach(e -&gt; out.print(print(Evaluator.evaluate(e, env))));</span>
+
+<span class="nc" id="L41">                    input = &quot;&quot;;</span>
+                }
+
+<span class="nc" id="L44">            } catch (Throwable t) {</span>
+<span class="nc" id="L45">                out.println(&quot;Error: &quot; + t.getMessage());</span>
+<span class="nc" id="L46">                input = &quot;&quot;;</span>
+<span class="nc" id="L47">            }</span>
+        }
+<span class="nc" id="L49">    }</span>
+
+    private static String readLine(@NotNull BufferedReader bufferedReader) throws IOException {
+<span class="nc" id="L52">        String line = &quot;&quot;;</span>
+        do {
+<span class="nc" id="L54">            String l = bufferedReader.readLine();</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (l == null) return null;</span>
+<span class="nc" id="L56">            line += l + '\n';</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        } while (bufferedReader.ready());</span>
+<span class="nc" id="L58">        return line;</span>
+    }
+
+    private static boolean completeExpression(@NotNull String input) {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        return Reader.countOpenParens(input) == 0;</span>
+    }
+
+    private static void prompt(@NotNull PrintStream out, int openParenCount) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (openParenCount == 0) {</span>
+<span class="nc" id="L67">            out.print(&quot; &gt; &quot;);</span>
+        } else {
+<span class="nc" id="L69">            indent(out, openParenCount);</span>
+        }
+<span class="nc" id="L71">    }</span>
+
+    private static void indent(@NotNull PrintStream out, int openParenCount) {
+<span class="nc" id="L74">        out.print(&quot;... &quot;);</span>
+<span class="nc" id="L75">        IntStream.range(0, openParenCount).forEach(i -&gt; out.print(&quot;  &quot;));</span>
+<span class="nc" id="L76">    }</span>
+
+    private static String print(@NotNull Expression expression) {
+<span class="nc" id="L79">        String exp = expression.print();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (exp.isEmpty()) {</span>
+<span class="nc" id="L81">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L83">        return String.format(&quot;-&gt; %s\n&quot;, exp);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

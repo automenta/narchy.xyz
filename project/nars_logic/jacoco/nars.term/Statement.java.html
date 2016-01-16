@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Statement.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term</a> &gt; <span class="el_source">Statement.java</span></div><h1>Statement.java</h1><pre class="source lang-java linenums">/*
+ * Statement.java
+ *
+ * Copyright (C) 2008  Pei Wang
+ *
+ * This file is part of Open-NARS.
+ *
+ * Open-NARS is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Open-NARS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Open-NARS.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package nars.term;
+
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+
+/**
+ * A statement or relation is a compound term, consisting of a subject, a predicate, and a
+ * relation symbol in between. It can be of either first-order or higher-order.
+ */
+@Deprecated
+public interface Statement {
+
+    /**
+     * Check the validity of a potential Statement. [To be refined]
+     * &lt;p&gt;
+     *
+     * @param subject   The first component
+     * @param predicate The second component
+     * @return Whether The Statement is invalid
+     */
+    static boolean invalidStatement(@Nullable Term subject, @Nullable Term predicate) {
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (subject == null || predicate == null)</span>
+<span class="nc" id="L45">            return true;</span>
+
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (subject.equals(predicate))</span>
+<span class="nc" id="L48">            return true;</span>
+
+<span class="fc" id="L50">        return invalidStatement2(subject, predicate);</span>
+    }
+
+    /** skips the null and equality test */
+    static boolean invalidStatement2(@NotNull Term subject, @NotNull Term predicate) {
+
+        //TODO combine these mirrored invalidReflexive calls into one combined, unredundant operation
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (invalidReflexive(subject, predicate))</span>
+<span class="fc" id="L58">            return true;</span>
+
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (invalidReflexive(predicate, subject))</span>
+<span class="fc" id="L61">            return true;</span>
+
+
+<span class="fc bfc" id="L64" title="All 4 branches covered.">        if ((Statement.is(subject)) &amp;&amp; (Statement.is(predicate))) {</span>
+
+<span class="fc" id="L66">            Term t11 = Statement.subj(subject);</span>
+<span class="fc" id="L67">            Term t22 = Statement.pred(predicate);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (!t11.equals(t22))</span>
+<span class="fc" id="L69">                return false;</span>
+
+<span class="fc" id="L71">            Term t12 = Statement.pred(subject);</span>
+<span class="fc" id="L72">            Term t21 = Statement.subj(predicate);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (t12.equals(t21))</span>
+<span class="nc" id="L74">                return true;</span>
+        }
+<span class="fc" id="L76">        return false;</span>
+    }
+
+
+    static boolean is(@NotNull Termed t) {
+<span class="fc" id="L81">        return t.op().isStatement();</span>
+    }
+
+    static Term subj(@NotNull Termed t) {
+<span class="fc" id="L85">        return ((TermContainer)t.term()).term(0);</span>
+    }
+    static Term pred(@NotNull Termed t) {
+<span class="fc" id="L88">        return ((TermContainer)t.term()).term(1);</span>
+    }
+
+    /**
+     * Check if one term is identical to or included in another one, except in a
+     * reflexive relation
+     * &lt;p&gt;
+     *
+     * @param t1 The first term
+     * @param t2 The second term
+     * @return Whether they cannot be related in a statement
+     */
+    static boolean invalidReflexive(Term t1, Term t2) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!(t1 instanceof Compound)) {</span>
+<span class="fc" id="L102">            return false;</span>
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if ((t1.op().isImage()/*Ext) || (t1 instanceof ImageInt*/)) {</span>
+<span class="fc" id="L105">            return false;</span>
+        }
+<span class="fc" id="L107">        return t1.containsTerm(t2);</span>
+    }
+
+
+//    public static boolean invalidPair(final Term s1, final Term s2) {
+//        boolean s1Indep = s1.hasVarIndep();
+//        boolean s2Indep = s2.hasVarIndep();
+//        //return (s1Indep &amp;&amp; !s2Indep || !s1Indep &amp;&amp; s2Indep);
+//        return s1Indep ^ s2Indep;
+//    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

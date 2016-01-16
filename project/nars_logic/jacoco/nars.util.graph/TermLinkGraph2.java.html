@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TermLinkGraph2.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.graph</a> &gt; <span class="el_source">TermLinkGraph2.java</span></div><h1>TermLinkGraph2.java</h1><pre class="source lang-java linenums">package nars.util.graph;
+
+import nars.$;
+import nars.NAR;
+import nars.bag.Bag;
+import nars.concept.Concept;
+import nars.term.Term;
+import nars.term.Termed;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jgrapht.alg.ConnectivityInspector;
+import org.jgrapht.graph.DirectedPseudograph;
+
+import java.io.PrintStream;
+import java.util.Set;
+
+/**
+ * Generates a graph of a set of Concept's TermLinks. Each TermLink is an edge,
+ * and the set of unique Concepts and Terms linked are the vertices.
+ */
+public class TermLinkGraph2 extends DirectedPseudograph&lt;Termed, Termed&gt; {
+
+    public TermLinkGraph2() {
+<span class="nc" id="L24">        super((a, b) -&gt; {</span>
+<span class="nc" id="L25">            return $.p((Term)a,(Term)b);</span>
+        });
+<span class="nc" id="L27">    }</span>
+
+
+    public TermLinkGraph2(@NotNull NAR n) {
+<span class="nc" id="L31">        this();</span>
+<span class="nc" id="L32">        add(n, true);</span>
+<span class="nc" id="L33">    }</span>
+
+    public TermLinkGraph2(@NotNull Concept... c) {
+<span class="nc" id="L36">        this();</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        for (Concept x : c)</span>
+<span class="nc" id="L38">            add(x, true);</span>
+<span class="nc" id="L39">    }</span>
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="nc" id="L44">        return '[' + vertexSet().toString() + &quot;, &quot; + edgeSet() + ']';</span>
+    }
+
+    public void print(@NotNull PrintStream out) {
+
+<span class="nc" id="L49">        Set&lt;Termed&gt; vs = vertexSet();</span>
+
+<span class="nc" id="L51">        out.println(getClass().getSimpleName() + &quot; numTerms=&quot; + vs.size() + &quot;, numTermLinks=&quot; + edgeSet().size() );</span>
+<span class="nc" id="L52">        out.print(&quot;\t&quot;);</span>
+<span class="nc" id="L53">        out.println(this);</span>
+
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        for (Termed t : vs) {</span>
+<span class="nc" id="L56">            out.print(t + &quot;:  &quot;);</span>
+<span class="nc" id="L57">            outgoingEdgesOf(t).forEach(e -&gt;</span>
+<span class="nc" id="L58">                out.print(&quot;  &quot; + e)</span>
+            );
+<span class="nc" id="L60">            out.println();</span>
+<span class="nc" id="L61">        }</span>
+<span class="nc" id="L62">        out.println();</span>
+
+<span class="nc" id="L64">    }</span>
+
+    public static class TermLinkTemplateGraph extends TermLinkGraph2 {
+
+        public TermLinkTemplateGraph(@NotNull NAR n) {
+<span class="nc" id="L69">            super(n);</span>
+<span class="nc" id="L70">        }</span>
+
+        /** add the termlink templates instead of termlinks */
+        @Override protected void addTermLinks(@NotNull Concept c) {
+<span class="nc" id="L74">            Term sourceTerm = c.get();</span>
+
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            for (Termed t : c.getTermLinkTemplates()) {</span>
+<span class="nc" id="L77">                Term targetTerm = t.term();</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                if (!containsVertex(targetTerm)) {</span>
+<span class="nc" id="L79">                    addVertex(targetTerm);</span>
+                }
+
+<span class="nc" id="L82">                addEdge(sourceTerm, targetTerm );</span>
+            }
+<span class="nc" id="L84">        }</span>
+    }
+
+    @NotNull
+    public TermLinkGraph2 add(@NotNull Concept c, boolean includeTermLinks/*, boolean includeTaskLinks, boolean includeOtherReferencedConcepts*/) {
+<span class="nc" id="L89">        Term source = c.get();</span>
+
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (!containsVertex(source)) {</span>
+<span class="nc" id="L92">            addVertex(source);</span>
+        }
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (includeTermLinks) {</span>
+<span class="nc" id="L96">            addTermLinks(c);</span>
+        }
+
+                /*
+                if (includeTaskLinks) {
+                    for (TaskLink t : c.taskLinks.values()) {
+                        Task target = t.targetTask;
+                        if (!containsVertex(target)) {
+                            addVertex(target);
+                        }
+                        addEdge(source, target, t);
+                    }
+                }
+                */
+
+
+<span class="nc" id="L112">        return this;</span>
+    }
+
+    protected void addTermLinks(@Nullable Concept c) {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (c == null)</span>
+<span class="nc" id="L117">            throw new RuntimeException(&quot;null concept&quot;);</span>
+
+<span class="nc" id="L119">        Term cterm = c.get();</span>
+
+<span class="nc" id="L121">        Bag&lt;Termed&gt; tl = c.getTermLinks();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (tl == null) return;</span>
+
+<span class="nc" id="L124">        tl.forEach(t -&gt; {</span>
+<span class="nc" id="L125">            Termed target = t.get();</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (!containsVertex(target)) {</span>
+<span class="nc" id="L127">                addVertex(target);</span>
+            }
+
+<span class="nc" id="L130">            addEdge(cterm, target);</span>
+<span class="nc" id="L131">        });</span>
+<span class="nc" id="L132">    }</span>
+
+
+    @NotNull
+    public TermLinkGraph2 add(@NotNull NAR n, boolean includeTermLinks/*, boolean includeTaskLinks, boolean includeOtherReferencedConcepts*/) {
+
+<span class="nc" id="L138">        n.forEachConcept(c -&gt; add(c, includeTermLinks));</span>
+
+<span class="nc" id="L140">        return this;</span>
+    }
+
+    public boolean isConnected() {
+<span class="nc" id="L144">        ConnectivityInspector&lt;Termed,Termed&gt; ci = new ConnectivityInspector(this);</span>
+<span class="nc" id="L145">        return ci.isGraphConnected();</span>
+    }
+
+//    public void add(Memory memory) {
+//        add(memory.getCycleProcess(), true);
+//    }
+
+    /*public boolean includeLevel(int l) {
+        return true;
+    }*/
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Budget.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.budget</a> &gt; <span class="el_source">Budget.java</span></div><h1>Budget.java</h1><pre class="source lang-java linenums">package nars.budget;
+
+import nars.Symbols;
+import nars.data.BudgetedStruct;
+import nars.util.Texts;
+import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nullable;
+
+import static java.lang.Math.pow;
+import static nars.nal.UtilityFunctions.and;
+import static nars.nal.UtilityFunctions.or;
+import static nars.util.data.Util.equal;
+import static nars.util.data.Util.mean;
+
+/**
+ * Created by me on 12/11/15.
+ */
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">public abstract class Budget extends BudgetedHandle {</span>
+
+
+<span class="fc" id="L22">    public static final BudgetMerge plus = (tgt, src, srcScale) -&gt; {</span>
+<span class="nc" id="L23">        float dp = src.getPriority() * srcScale;</span>
+
+<span class="nc" id="L25">        float currentPriority = tgt.getPriorityIfNaNThenZero();</span>
+
+<span class="nc" id="L27">        float nextPri = currentPriority + dp;</span>
+<span class="nc bnc" id="L28" title="All 2 branches missed.">        if (nextPri &gt; 1) nextPri = 1f;</span>
+
+<span class="nc" id="L30">        float currentNextPrioritySum = currentPriority + nextPri;</span>
+
+        /* current proportion */
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        float cp = currentNextPrioritySum != 0 ? currentPriority / currentNextPrioritySum : 0.5f;</span>
+
+        /* next proportion = 1 - cp */
+<span class="nc" id="L36">        float np = 1.0f - cp;</span>
+
+<span class="nc" id="L38">        float nextDur = cp * tgt.getDurability() + np * src.getDurability();</span>
+<span class="nc" id="L39">        float nextQua = cp * tgt.getQuality() + np * src.getQuality();</span>
+
+<span class="nc bnc" id="L41" title="All 4 branches missed.">        assert Float.isFinite(nextDur) : &quot;NaN dur: &quot; + src + ' ' + tgt.getDurability();</span>
+<span class="nc bnc" id="L42" title="All 4 branches missed.">        assert Float.isFinite(nextQua) : &quot;NaN quality&quot;;</span>
+
+<span class="nc" id="L44">        tgt.budget( nextPri,nextDur,nextQua);</span>
+<span class="nc" id="L45">    };</span>
+
+    //@Contract(pure = true)
+    public static boolean aveGeoNotLessThan(float min, float a, float b, float c) {
+<span class="nc" id="L49">        float minCubed = min * min * min; //cube both sides</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        return a * b * c &gt;= minCubed;</span>
+    }
+
+    public static float aveGeo(float a, float b, float c) {
+<span class="fc" id="L54">        return (float) pow(a * b * c, 1.0 / 3.0);</span>
+    }
+
+    //@Contract(pure = true)
+    public static boolean getDeleted(float pri) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        return !Float.isFinite(pri);</span>
+    }
+
+    public static String toString(@NotNull Budget b) {
+
+<span class="fc" id="L64">        return toStringBuilder(new StringBuilder(), Texts.n4(b.getPriority()), Texts.n4(b.getDurability()), Texts.n4(b.getQuality())).toString();</span>
+    }
+
+    @org.jetbrains.annotations.Nullable
+    public static StringBuilder toStringBuilder(@org.jetbrains.annotations.Nullable StringBuilder sb, @NotNull CharSequence priorityString, @NotNull CharSequence durabilityString, @NotNull CharSequence qualityString) {
+<span class="fc" id="L69">        int c = 1 + priorityString.length() + 1 + durabilityString.length() + 1 + qualityString.length() + 1;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (sb == null)</span>
+<span class="fc" id="L71">            sb = new StringBuilder(c);</span>
+        else
+<span class="fc" id="L73">            sb.ensureCapacity(c);</span>
+
+<span class="fc" id="L75">        sb.append(Symbols.BUDGET_VALUE_MARK)</span>
+<span class="fc" id="L76">                .append(priorityString).append(Symbols.VALUE_SEPARATOR)</span>
+<span class="fc" id="L77">                .append(durabilityString).append(Symbols.VALUE_SEPARATOR)</span>
+<span class="fc" id="L78">                .append(qualityString)</span>
+<span class="fc" id="L79">                .append(Symbols.BUDGET_VALUE_MARK);</span>
+
+<span class="fc" id="L81">        return  sb;</span>
+    }
+
+    /**
+     * set all quantities to zero
+     */
+    @org.jetbrains.annotations.Nullable
+    public Budget zero() {
+<span class="fc" id="L89">        return budget(0, 0, 0);</span>
+    }
+
+    public void delete() {
+<span class="fc" id="L93">        deleteBudget();</span>
+<span class="fc" id="L94">    }</span>
+
+    public void deleteBudget() {
+<span class="nc" id="L97">        setPriority(Float.NaN);</span>
+<span class="nc" id="L98">    }</span>
+
+    
+    
+    @NotNull
+    @Override
+    public Budget getBudget() {
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    
+    @Override
+    public abstract float getPriority();
+
+    
+    @Override
+    public abstract void setPriority(float p);
+
+    /**
+     * returns the period in time: currentTime - lastForgetTime and sets the lastForgetTime to currentTime
+     */
+
+    @Override
+    public abstract long setLastForgetTime(long currentTime);
+
+    
+    @Override
+    public abstract long getLastForgetTime();
+
+    public void mulPriority(float factor) {
+<span class="nc" id="L128">        setPriority(getPriority() * factor);</span>
+<span class="nc" id="L129">    }</span>
+
+    
+    @Override
+    public abstract float getDurability();
+
+    public abstract void setDurability(float d);
+
+    
+    @Override
+    public abstract float getQuality();
+
+    public abstract void setQuality(float q);
+
+    public boolean equalsByPrecision(@NotNull Budget t, float epsilon) {
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        return equal(getPriority(), t.getPriority(), epsilon) &amp;&amp;</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                equal(getDurability(), t.getDurability(), epsilon) &amp;&amp;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                equal(getQuality(), t.getQuality(), epsilon);</span>
+    }
+
+    /**
+     * Increase priority value by a percentage of the remaining range.
+     * Uses the 'or' function so it is not linear
+     *
+     * @param v The increasing percent
+     */
+    public void orPriority(float v) {
+<span class="fc" id="L156">        setPriority(or(getPriority(), v));</span>
+<span class="fc" id="L157">    }</span>
+
+    /**
+     * merges another budget into this one, averaging each component
+     */
+    public void mergeAverage(@NotNull Budget that) {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (this == that) return;</span>
+
+<span class="nc" id="L165">        budget(</span>
+<span class="nc" id="L166">                mean(getPriority(), that.getPriority()),</span>
+<span class="nc" id="L167">                mean(getDurability(), that.getDurability()),</span>
+<span class="nc" id="L168">                mean(getQuality(), that.getQuality())</span>
+        );
+<span class="nc" id="L170">    }</span>
+
+
+    /**
+     * To summarize a BudgetValue into a single number in [0, 1]
+     *
+     * @return The summary value
+     */
+    public float summary() {
+<span class="fc" id="L179">        return aveGeo(getPriority(), getDurability(), getQuality());</span>
+    }
+
+    @NotNull
+    @Override
+    public abstract Budget clone();
+
+    public boolean summaryLessThan(float s) {
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        return !summaryNotLessThan(s);</span>
+    }
+
+    /**
+     * uses optimized aveGeoNotLessThan to avoid a cube root operation
+     */
+    public boolean summaryNotLessThan(float min) {
+<span class="nc bnc" id="L194" title="All 4 branches missed.">        return min == 0f || aveGeoNotLessThan(min, getPriority(), getDurability(), getQuality());</span>
+    }
+
+
+//    public void maxDurability(final float otherDurability) {
+//        setDurability(Util.max(getDurability(), otherDurability)); //max durab
+//    }
+//
+//    public void maxQuality(final float otherQuality) {
+//        setQuality(Util.max(getQuality(), otherQuality)); //max durab
+//    }
+
+    /**
+     * Increase durability value by a percentage of the remaining range
+     *
+     * @param v The increasing percent
+     */
+    public void orDurability(float v) {
+<span class="fc" id="L212">        setDurability(or(getDurability(), v));</span>
+<span class="fc" id="L213">    }</span>
+
+    /**
+     * Decrease durability value by a percentage of the remaining range
+     *
+     * @param v The decreasing percent
+     */
+    public void andDurability(float v) {
+<span class="fc" id="L221">        setDurability(and(getDurability(), v));</span>
+<span class="fc" id="L222">    }</span>
+
+    /**
+     * AND's (multiplies) priority with another value
+     */
+    public void andPriority(float v) {
+<span class="fc" id="L228">        setPriority(and(getPriority(), v));</span>
+<span class="fc" id="L229">    }</span>
+
+    /**
+     * Whether the budget should get any processing at all
+     * &lt;p&gt;
+     * to be revised to depend on how busy the system is
+     * tests whether summary &gt;= threhsold
+     *
+     * @return The decision on whether to process the Item
+     */
+    public boolean summaryGreaterOrEqual(float budgetThreshold) {
+
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        if (getDeleted()) return false;</span>
+
+        /* since budget can only be positive.. */
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (budgetThreshold &lt;= 0) return true;</span>
+
+
+<span class="nc" id="L247">        return summaryNotLessThan(budgetThreshold);</span>
+    }
+
+    /**
+     * copies a budget into this; if source is null, it deletes the budget
+     */
+    @NotNull
+    public BudgetedStruct budget(@Nullable Budget source) {
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L256">            zero();</span>
+        } else {
+<span class="fc" id="L258">            budget(source.getPriority(), source.getDurability(), source.getQuality());</span>
+<span class="fc" id="L259">            setLastForgetTime(source.getLastForgetTime());</span>
+        }
+
+<span class="fc" id="L262">        return this;</span>
+    }
+
+    /**
+     * returns this budget, after being modified
+     */
+    @NotNull
+    public Budget budget(float p, float d, float q) {
+<span class="fc" id="L270">        setPriority(p);</span>
+<span class="fc" id="L271">        setDurability(d);</span>
+<span class="fc" id="L272">        setQuality(q);</span>
+<span class="fc" id="L273">        return this;</span>
+    }
+
+    @NotNull
+    public BudgetedStruct budget(@NotNull BudgetedHandle source) {
+<span class="nc" id="L278">        return budget(source.getBudget());</span>
+    }
+
+    public float getPriorityIfNaNThenZero() {
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        return Float.isFinite(getPriority()) ? getPriority() : 0;</span>
+    }
+
+    /**
+     * Briefly display the BudgetValue
+     *
+     * @return String representation of the value with 2-digit accuracy
+     */
+    @org.jetbrains.annotations.Nullable
+    public StringBuilder toBudgetStringExternal() {
+<span class="fc" id="L292">        return toBudgetStringExternal(null);</span>
+    }
+
+    @org.jetbrains.annotations.Nullable
+    public StringBuilder toBudgetStringExternal(StringBuilder sb) {
+        //return MARK + priority.toStringBrief() + SEPARATOR + durability.toStringBrief() + SEPARATOR + quality.toStringBrief() + MARK;
+
+<span class="fc" id="L299">        CharSequence priorityString = Texts.n2(getPriority());</span>
+<span class="fc" id="L300">        CharSequence durabilityString = Texts.n2(getDurability());</span>
+<span class="fc" id="L301">        CharSequence qualityString = Texts.n2(getQuality());</span>
+
+<span class="fc" id="L303">        return toStringBuilder(sb, priorityString, durabilityString, qualityString);</span>
+    }
+
+    @NotNull
+    public String toBudgetString() {
+<span class="fc" id="L308">        return toBudgetStringExternal().toString();</span>
+    }
+
+    @NotNull
+    public String getBudgetString() {
+<span class="fc" id="L313">        return toString(this);</span>
+    }
+
+    public void set(@NotNull Budget b) {
+<span class="fc" id="L317">        budget(b.getPriority(), b.getDurability(), b.getQuality());</span>
+<span class="fc" id="L318">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

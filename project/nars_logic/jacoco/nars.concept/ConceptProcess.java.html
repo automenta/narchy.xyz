@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ConceptProcess.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.concept</a> &gt; <span class="el_source">ConceptProcess.java</span></div><h1>ConceptProcess.java</h1><pre class="source lang-java linenums">/*
+ * Here comes the text of your license
+ * Each line should be prefixed with  *
+ */
+package nars.concept;
+
+import nars.Global;
+import nars.NAR;
+import nars.Premise;
+import nars.bag.BLink;
+import nars.nal.Tense;
+import nars.task.Task;
+import nars.term.Termed;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Set;
+import java.util.function.Consumer;
+
+/** Firing a concept (reasoning event). Derives new Tasks via reasoning rules
+ *
+ *  Concept
+ *     Task
+ *     TermLinks
+ *
+ * */
+public final class ConceptProcess implements Premise {
+
+
+    public final NAR nar;
+    public final BLink&lt;Task&gt; taskLink;
+    public final BLink&lt;Concept&gt; conceptLink;
+    public final BLink&lt;Termed&gt; termLink;
+
+    @Nullable
+    private final Task currentBelief;
+    private final boolean cyclic;
+
+    @Override
+    public final Task getTask() {
+<span class="fc" id="L41">        return taskLink.get();</span>
+    }
+
+
+
+    public Concept getConcept() {
+<span class="nc" id="L47">        return conceptLink.get();</span>
+    }
+
+<span class="fc" id="L50">    public ConceptProcess(NAR nar, BLink&lt;Concept&gt; conceptLink, BLink&lt;Task&gt; taskLink, BLink&lt;Termed&gt; termLink, @Nullable Task belief) {</span>
+<span class="fc" id="L51">        this.nar = nar;</span>
+
+<span class="fc" id="L53">        this.taskLink = taskLink;</span>
+<span class="fc" id="L54">        this.conceptLink = conceptLink;</span>
+<span class="fc" id="L55">        this.termLink = termLink;</span>
+
+        //belief can be null:
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (belief!=null)  {</span>
+<span class="fc" id="L59">            currentBelief = belief;</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">            cyclic = (belief != null) &amp;&amp; Tense.overlapping(getTask(), belief);</span>
+        } else {
+<span class="fc" id="L62">            currentBelief = null;</span>
+<span class="fc" id="L63">            cyclic = false;</span>
+        }
+<span class="fc" id="L65">    }</span>
+
+
+    public static int fireAll(@NotNull NAR nar, BLink&lt;Concept&gt; concept, @NotNull BLink&lt;Task&gt; taskLink, @NotNull BLink&lt;Termed&gt; termLink, @NotNull Consumer&lt;ConceptProcess&gt; cp) {
+
+<span class="fc" id="L70">        Task task = taskLink.get();</span>
+
+<span class="fc" id="L72">        Concept beliefConcept = nar.concept(termLink.get());</span>
+
+        Task belief;
+<span class="pc bpc" id="L75" title="1 of 4 branches missed.">        if ((beliefConcept != null) &amp;&amp; (beliefConcept.hasBeliefs())) {</span>
+<span class="fc" id="L76">            long now = nar.time();</span>
+<span class="fc" id="L77">            belief = beliefConcept.getBeliefs().top(now);</span>
+<span class="pc bpc" id="L78" title="2 of 4 branches missed.">            if (belief == null || belief.getDeleted()) {</span>
+<span class="nc" id="L79">                beliefConcept.print();</span>
+<span class="nc" id="L80">                beliefConcept.getBeliefs().top(now);</span>
+<span class="nc" id="L81">                throw new RuntimeException(&quot;deleted belief: &quot; + belief + &quot; &quot; + beliefConcept.hasBeliefs());</span>
+            }
+<span class="fc" id="L83">        } else {</span>
+<span class="fc" id="L84">            belief = null;</span>
+        }
+
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (belief != null) {</span>
+<span class="fc" id="L88">            Set&lt;Task&gt; beliefs = Global.newHashSet(0);</span>
+<span class="fc" id="L89">            Premise.match(task, belief, nar, beliefs::add);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (!beliefs.isEmpty()) {</span>
+<span class="fc" id="L91">                beliefs.forEach(matchedBelief -&gt; {</span>
+<span class="fc" id="L92">                    cp.accept(new ConceptProcess(nar, concept,</span>
+                            taskLink, termLink, matchedBelief));
+<span class="fc" id="L94">                });</span>
+<span class="fc" id="L95">                return beliefs.size();</span>
+            }
+        }
+
+<span class="fc" id="L99">        cp.accept(new ConceptProcess(nar, concept,</span>
+                taskLink, termLink, belief));
+<span class="fc" id="L101">        return 1;</span>
+
+
+
+
+
+    }
+
+//    /**
+//     * @return the current termLink aka BeliefLink
+//     */
+//    @Override
+//    public final BagBudget&lt;Termed&gt; getTermLink() {
+//        return termLink;
+//    }
+
+
+    public final Termed getBeliefTerm() {
+<span class="fc" id="L119">        Task x = getBelief();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        return x== null ? termLink.get() :</span>
+<span class="fc" id="L121">                x.term();</span>
+    }
+
+
+//    protected void beforeFinish(final long now) {
+//
+//        Memory m = nar.memory();
+//        m.logic.TASKLINK_FIRE.hit();
+//        m.emotion.busy(getTask(), this);
+//
+//    }
+
+//    @Override
+//    final protected Collection&lt;Task&gt; afterDerive(Collection&lt;Task&gt; c) {
+//
+//        final long now = nar.time();
+//
+//        beforeFinish(now);
+//
+//        return c;
+//    }
+
+
+    @Nullable
+    @Override
+    public final Task getBelief() {
+<span class="fc" id="L147">        return currentBelief;</span>
+    }
+
+    @Override
+    public final boolean isCyclic() {
+<span class="fc" id="L152">        return cyclic;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L157">        return new StringBuilder().append(</span>
+<span class="fc" id="L158">                getClass().getSimpleName())</span>
+<span class="fc" id="L159">                .append('[').append(conceptLink).append(',')</span>
+<span class="fc" id="L160">                            .append(taskLink).append(',')</span>
+<span class="fc" id="L161">                            .append(termLink).append(',')</span>
+<span class="fc" id="L162">                            .append(getBelief())</span>
+<span class="fc" id="L163">                .append(']')</span>
+<span class="fc" id="L164">                .toString();</span>
+    }
+
+    @Override
+    public NAR nar() {
+<span class="fc" id="L169">        return nar;</span>
+    }
+
+    public int getMaxMatches() {
+<span class="fc" id="L173">        final float min = Global.MIN_TERMUTATIONS_PER_MATCH, max = Global.MAX_TERMUTATIONS_PER_MATCH;</span>
+<span class="fc" id="L174">        return (int)Math.ceil(getTask().getPriority() * (max-min) + min);</span>
+    }
+
+//    /** max(tasktime, belieftime) */
+//    public long getMaxOccurrenceTime() {
+//        long occ= getTask().getOccurrenceTime();
+//        Task b = getBelief();
+//        if (b!=null) {
+//            occ = Math.max(occ, b.getOccurrenceTime());
+//        }
+//        return occ;
+//    }
+
+
+    //    /** supplies at most 1 premise containing the pair of next tasklink and termlink into a premise */
+//    public static Stream&lt;Task&gt; nextPremise(NAR nar, final Concept concept, float taskLinkForgetDurations, Function&lt;ConceptProcess,Stream&lt;Task&gt;&gt; proc) {
+//
+//        TaskLink taskLink = concept.getTaskLinks().forgetNext(taskLinkForgetDurations, nar.memory());
+//        if (taskLink == null) return Stream.empty();
+//
+//        TermLink termLink = concept.getTermLinks().forgetNext(nar.memory().termLinkForgetDurations, nar.memory());
+//        if (termLink == null) return Stream.empty();
+//
+//
+//        return proc.apply(premise(nar, concept, taskLink, termLink));
+//
+//    }
+
+//    public static ConceptProcess premise(NAR nar, Concept concept, TaskLink taskLink, TermLink termLink) {
+////        if (Terms.equalSubTermsInRespectToImageAndProduct(taskLink.getTerm(), termLink.getTerm()))
+////            return null;
+//
+////        if (taskLink.isDeleted())
+////            throw new RuntimeException(&quot;tasklink null&quot;); //bag should not have returned this
+//
+//    }
+
+
+
+//    public abstract Stream&lt;Task&gt; derive(final Deriver p);
+
+//    public static void forEachPremise(NAR nar, @Nullable final Concept concept, @Nullable TaskLink taskLink, int termLinks, float taskLinkForgetDurations, Consumer&lt;ConceptProcess&gt; proc) {
+//        if (concept == null) return;
+//
+//        concept.updateLinks();
+//
+//        if (taskLink == null) {
+//            taskLink = concept.getTaskLinks().forgetNext(taskLinkForgetDurations, concept.getMemory());
+//            if (taskLink == null)
+//                return;
+//        }
+//
+//
+//
+//
+//        proc.accept( new ConceptTaskLinkProcess(nar, concept, taskLink) );
+//
+//        if ((termLinks &gt; 0) &amp;&amp; (taskLink.type!=TermLink.TRANSFORM))
+//            ConceptProcess.forEachPremise(nar, concept, taskLink,
+//                    termLinks,
+//                    proc
+//            );
+//    }
+
+//    /** generates a set of termlink processes by sampling
+//     * from a concept's TermLink bag
+//     * @return how many processes generated
+//     * */
+//    public static int forEachPremise(NAR nar, Concept concept, TaskLink t, final int termlinksToReason, Consumer&lt;ConceptProcess&gt; proc) {
+//
+//        int numTermLinks = concept.getTermLinks().size();
+//        if (numTermLinks == 0)
+//            return 0;
+//
+//        TermLink[] termlinks = new TermLink[termlinksToReason];
+//
+//        //int remainingProcesses = Math.min(termlinksToReason, numTermLinks);
+//
+//        //while (remainingProcesses &gt; 0) {
+//
+//            Arrays.fill(termlinks, null);
+//
+//            concept.getPremiseGenerator().nextTermLinks(concept, t, termlinks);
+//
+//            int created = 0;
+//            for (TermLink tl : termlinks) {
+//                if (tl == null) break;
+//
+//                proc.accept(
+//                    new ConceptTaskTermLinkProcess(nar, concept, t, tl)
+//                );
+//                created++;
+//            }
+//
+//
+//          //  remainingProcesses--;
+//
+//
+//        //}
+//
+//        /*if (remainingProcesses == 0) {
+//            System.err.println(now + &quot;: &quot; + currentConcept + &quot;: &quot; + remainingProcesses + &quot;/&quot; + termLinksToFire + &quot; firings over &quot; + numTermLinks + &quot; termlinks&quot; + &quot; &quot; + currentTaskLink.getRecords() + &quot; for TermLinks &quot;
+//                    //+ currentConcept.getTermLinks().values()
+//            );
+//            //currentConcept.taskLinks.printAll(System.out);
+//        }*/
+//
+//        return created;
+//
+//    }
+
+//    /** override-able filter for derivations which can be applied
+//     * once the term and the truth value are known */
+//    public boolean validJudgment(Term derivedTerm, Truth truth) {
+//        return true;
+//    }
+//
+//    /** override-able filter for derivations which can be applied
+//     * once the term and the truth value are known */
+//    public boolean validGoal(Term derivedTerm, Truth truth) {
+//        return true;
+//    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

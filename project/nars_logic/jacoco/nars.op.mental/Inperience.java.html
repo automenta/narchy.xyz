@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Inperience.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.op.mental</a> &gt; <span class="el_source">Inperience.java</span></div><h1>Inperience.java</h1><pre class="source lang-java linenums">package nars.op.mental;
+
+import com.google.common.util.concurrent.AtomicDouble;
+import nars.*;
+import nars.budget.Budget;
+import nars.nal.nal8.Operator;
+import nars.task.MutableTask;
+import nars.task.Task;
+import nars.term.Term;
+import nars.term.compound.Compound;
+import nars.truth.Truth;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Arrays;
+import java.util.Random;
+
+/**
+ * Internal Experience (NAL9)
+ * To remember activity as internal action operations
+ *
+ * https://www.youtube.com/watch?v=ia4wMU-vfrw
+ */
+public class Inperience {
+
+
+<span class="nc" id="L26">    public static float MINIMUM_BUDGET_SUMMARY_TO_CREATE = 0.5f; //0.92</span>
+<span class="nc" id="L27">    public static float MINIMUM_BUDGET_SUMMARY_TO_CREATE_WONDER_EVALUATE = 0.92f;</span>
+
+    //internal experience has less durability?
+    public static final float INTERNAL_EXPERIENCE_PROBABILITY = 0.01f;
+
+    //less probable form
+    public static final float INTERNAL_EXPERIENCE_RARE_PROBABILITY =
+            INTERNAL_EXPERIENCE_PROBABILITY / 4.0f;
+
+
+    //internal experience has less durability?
+<span class="nc" id="L38">    public static float INTERNAL_EXPERIENCE_DURABILITY_MUL = 0.1f; //0.1</span>
+    //internal experience has less priority?
+<span class="nc" id="L40">    public static float INTERNAL_EXPERIENCE_PRIORITY_MUL = 0.1f; //0.1</span>
+
+    @Deprecated
+<span class="nc" id="L43">    public static boolean enabled = true;</span>
+    @NotNull
+    private final NAR nar;
+
+
+    /** minimum expectation necessary to create a concept
+     *  original value: 0.66
+     * */
+<span class="nc" id="L51">    @NotNull</span>
+    public AtomicDouble conceptCreationExpectation = new AtomicDouble(0.66);
+
+
+//    public boolean isEnableWantBelieve() {
+//        return enableWantBelieve;
+//    }
+//    public void setEnableWantBelieve(boolean val) {
+//        enableWantBelieve =val;
+//    }
+
+    public static double getMinCreationBudgetSummary() {
+<span class="nc" id="L63">        return MINIMUM_BUDGET_SUMMARY_TO_CREATE;</span>
+    }
+
+    public static void setMinCreationBudgetSummary(double val) {
+<span class="nc" id="L67">        MINIMUM_BUDGET_SUMMARY_TO_CREATE = (float) val;</span>
+<span class="nc" id="L68">    }</span>
+
+    public static double getMinCreationBudgetSummaryWonderEvaluate() {
+<span class="nc" id="L71">        return MINIMUM_BUDGET_SUMMARY_TO_CREATE_WONDER_EVALUATE;</span>
+    }
+
+    public static void setMinCreationBudgetSummaryWonderEvaluate(double val) {
+<span class="nc" id="L75">        MINIMUM_BUDGET_SUMMARY_TO_CREATE_WONDER_EVALUATE = (float) val;</span>
+<span class="nc" id="L76">    }</span>
+
+
+<span class="nc" id="L79">    public static final Operator believe = Operator.the(&quot;believe&quot;);</span>
+<span class="nc" id="L80">    public static final Operator want = Operator.the(&quot;want&quot;);</span>
+<span class="nc" id="L81">    public static final Operator wonder = Operator.the(&quot;wonder&quot;);</span>
+<span class="nc" id="L82">    public static final Operator evaluate = Operator.the(&quot;evaluate&quot;);</span>
+<span class="nc" id="L83">    public static final Operator anticipate = Operator.the(&quot;anticipate&quot;);</span>
+
+<span class="nc" id="L85">    static final Operator[] nonInnateBeliefOperators = {</span>
+<span class="nc" id="L86">            Operator.the(&quot;remind&quot;),</span>
+<span class="nc" id="L87">            Operator.the(&quot;doubt&quot;),</span>
+<span class="nc" id="L88">            Operator.the(&quot;consider&quot;),</span>
+            evaluate,
+<span class="nc" id="L90">            Operator.the(&quot;hestitate&quot;),</span>
+            wonder,
+            believe,
+            want
+    };
+
+
+    /**
+     * whether it is full internal experience, or minimal (false)
+     */
+    public boolean isFull() {
+<span class="nc" id="L101">        return false;</span>
+    }
+
+
+    public static boolean random(@NotNull Random r, float prob, int volume) {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        return r.nextFloat()*volume &lt;= prob;</span>
+    }
+
+<span class="nc" id="L109">    public Inperience(@NotNull NAR n) {</span>
+
+<span class="nc" id="L111">        this.nar = n;</span>
+
+<span class="nc" id="L113">        n.memory.eventTaskProcess.on(tp -&gt; experienceFromTaskInternal(tp.getTask()));</span>
+
+<span class="nc" id="L115">        n.memory.eventConceptProcess.on(p -&gt; {</span>
+<span class="nc" id="L116">            Task belief = p.getBelief();</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (belief == null) return;</span>
+<span class="nc" id="L118">            Task task = p.getTask();</span>
+
+<span class="nc" id="L120">            Random r = p.memory().random;</span>
+
+<span class="nc" id="L122">            int vol = Math.max(task.term().volume(), belief.term().volume());</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            if (random(r, INTERNAL_EXPERIENCE_RARE_PROBABILITY, vol)) {</span>
+<span class="nc" id="L124">                nonInnate(task, belief, p, randomNonInnate(r) );</span>
+            }
+
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (belief.term().op().isImplication() &amp;&amp;</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                    random(r, INTERNAL_EXPERIENCE_PROBABILITY, vol) ) {</span>
+<span class="nc" id="L129">                internalizeImplication(task, belief, p);</span>
+            }
+<span class="nc" id="L131">        });</span>
+<span class="nc" id="L132">    }</span>
+
+
+    public static Compound toTerm(@NotNull Task s, Term self, float conceptCreationExpectation) {
+        Operator opTerm;
+<span class="nc bnc" id="L137" title="All 5 branches missed.">        switch (s.getPunctuation()) {</span>
+            case Symbols.JUDGMENT:
+<span class="nc" id="L139">                opTerm = believe;</span>
+<span class="nc" id="L140">                break;</span>
+            case Symbols.GOAL:
+<span class="nc" id="L142">                opTerm = want;</span>
+<span class="nc" id="L143">                break;</span>
+            case Symbols.QUESTION:
+<span class="nc" id="L145">                opTerm = wonder;</span>
+<span class="nc" id="L146">                break;</span>
+            case Symbols.QUEST:
+<span class="nc" id="L148">                opTerm = evaluate;</span>
+<span class="nc" id="L149">                break;</span>
+            default:
+<span class="nc" id="L151">                return null;</span>
+        }
+
+<span class="nc" id="L154">        Truth tr = s.getTruth();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        Term[] arg = new Term[1 + (tr == null ? 1 : 2)];</span>
+<span class="nc" id="L156">        arg[0] = s.term();</span>
+<span class="nc" id="L157">        int k = 1;</span>
+
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (tr != null) {</span>
+<span class="nc" id="L160">            arg[k++] = tr.toWordTerm(conceptCreationExpectation);</span>
+        }
+<span class="nc" id="L162">        arg[k] = self;</span>
+
+<span class="nc" id="L164">        Compound operation = $.oper(opTerm, arg);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (operation == null) {</span>
+<span class="nc" id="L166">            throw new RuntimeException(&quot;Unable to create Inheritance: &quot; + opTerm + &quot;, &quot; + Arrays.toString(arg));</span>
+        }
+<span class="nc" id="L168">        return operation;</span>
+    }
+
+
+
+    public static Operator randomNonInnate(@NotNull Random r) {
+<span class="nc" id="L174">        return nonInnateBeliefOperators[r.nextInt(nonInnateBeliefOperators.length)];</span>
+    }
+
+
+//    public Task experienceFromBelief(Premise nal, Budget b, Sentence belief) {
+//        return experienceFromTask(nal,
+//                new Task(belief.clone(), b, null),
+//                false);
+//    }
+
+//    public Task experienceFromTask(Premise nal, Task task, boolean full) {
+//        if (!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY) {
+//            return experienceFromTaskInternal(nal, task, full);
+//        }
+//        return null;
+//    }
+
+    protected void experienceFromTaskInternal(@NotNull final Task task) {
+
+<span class="nc" id="L193">        final Term self = nar.memory.self();</span>
+
+        // if(OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY ||
+        //         (!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY &amp;&amp; (task.sentence.punctuation==Symbols.QUESTION || task.sentence.punctuation==Symbols.QUEST))) {
+        //char punc = task.getPunctuation();
+<span class="nc" id="L198">        Budget b = task.getBudget();</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (task.isQuestOrQuestion()) {</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (b.summaryLessThan(MINIMUM_BUDGET_SUMMARY_TO_CREATE_WONDER_EVALUATE)) {</span>
+<span class="nc" id="L201">                return;</span>
+            }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        } else if (b.summaryLessThan(MINIMUM_BUDGET_SUMMARY_TO_CREATE)) {</span>
+<span class="nc" id="L204">            return;</span>
+        }
+
+<span class="nc" id="L207">        Term content = task.term();</span>
+        // to prevent infinite recursions
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (Op.isOperation(content)/* ||  Memory.randomNumber.nextFloat()&gt;Global.INTERNAL_EXPERIENCE_PROBABILITY*/) {</span>
+<span class="nc" id="L210">            return;</span>
+        }
+
+<span class="nc" id="L213">        Compound ret = toTerm(task, self, conceptCreationExpectation.floatValue());</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (ret == null) {</span>
+<span class="nc" id="L215">            return;</span>
+        }
+
+
+
+//        float pri = Global.DEFAULT_JUDGMENT_PRIORITY * INTERNAL_EXPERIENCE_PRIORITY_MUL;
+//        float dur = Global.DEFAULT_JUDGMENT_DURABILITY * INTERNAL_EXPERIENCE_DURABILITY_MUL;
+//        if (!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY) {
+//            pri *= INTERNAL_EXPERIENCE_PRIORITY_MUL;
+//            dur *= INTERNAL_EXPERIENCE_DURABILITY_MUL;
+//        }
+
+<span class="nc" id="L227">        long now = nar.time();</span>
+<span class="nc" id="L228">        nar.input(new MutableTask(ret).judgment()</span>
+<span class="nc" id="L229">                        .parent(task).time(now, now)</span>
+                        //.truth(1.0f, Global.DEFAULT_JUDGMENT_CONFIDENCE)
+                        //.budget(pri, dur)
+<span class="nc" id="L232">                        .because(&quot;Innerperience&quot;));</span>
+<span class="nc" id="L233">    }</span>
+
+
+
+    private static void internalizeImplication(@NotNull Task task, @NotNull Task belief, @NotNull Premise nal) {
+<span class="nc" id="L238">        Compound taskTerm = task.term();</span>
+<span class="nc" id="L239">        Compound beliefTerm = belief.term();</span>
+
+<span class="nc bnc" id="L241" title="All 4 branches missed.">        if (beliefTerm.hasT() &amp;&amp; beliefTerm.t() &gt; 0) {</span>
+            //1. check if its (&amp;/,term,+i1,...,+in) =/&gt; anticipateTerm form:
+<span class="nc" id="L243">            boolean valid = true;</span>
+<span class="nc" id="L244">            Term impsub = beliefTerm.term(0);</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (impsub.op() == Op.CONJUNCTION) {</span>
+<span class="nc" id="L246">                Compound conj = (Compound) impsub;</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                if (!conj.term(0).equals(taskTerm)) {</span>
+<span class="nc" id="L248">                    valid = false; //the expected needed term is not included</span>
+                }
+<span class="nc" id="L250">            } else {</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">                if (!impsub.equals(taskTerm)) {</span>
+<span class="nc" id="L252">                    valid = false;</span>
+                }
+            }
+
+            //TODO use interval?
+
+
+<span class="nc bnc" id="L259" title="All 2 branches missed.">            if (valid) {</span>
+                //long interval = (impsub instanceof Interval ? ((Interval)impsub).duration() : 0);
+<span class="nc" id="L261">                int interval = 0;</span>
+
+<span class="nc" id="L263">                beliefReasonDerive(task, belief,</span>
+<span class="nc" id="L264">                        $.oper(anticipate, beliefTerm.term(1)),</span>
+                        nal, interval);
+            }
+        }
+<span class="nc" id="L268">    }</span>
+
+    private static void nonInnate(Task task, @NotNull Task belief, @NotNull Premise nal, Operator op) {
+        //the operators which dont have a innate belief
+        //also get a chance to reveal its effects to the system this way
+
+<span class="nc" id="L274">            beliefReasonDerive(task, belief,</span>
+<span class="nc" id="L275">                    $.oper(op, belief.term()),</span>
+                    nal, 0);
+<span class="nc" id="L277">    }</span>
+
+    protected static void beliefReasonDerive(Task parent, Task belief, Compound new_term, @NotNull Premise p, long delay) {
+
+        //TODO should this be a mew stamp or attached to parent.. originally it was a fresh new stamp from memory
+
+<span class="nc" id="L283">        long now = p.time();</span>
+
+<span class="nc" id="L285">        p.nar().input(new MutableTask(new_term).goal()</span>
+                        /*.truth(1, Global.DEFAULT_JUDGMENT_CONFIDENCE)
+                        .budget(Global.DEFAULT_GOAL_PRIORITY * INTERNAL_EXPERIENCE_PRIORITY_MUL,
+                                Global.DEFAULT_GOAL_DURABILITY * INTERNAL_EXPERIENCE_DURABILITY_MUL)*/
+<span class="nc" id="L289">                        .parent(parent, belief)</span>
+<span class="nc" id="L290">                        .time(now, now + delay)</span>
+<span class="nc" id="L291">                        .because(&quot;Inner Belief&quot;)</span>
+        );
+<span class="nc" id="L293">    }</span>
+
+
+//
+//    //TODO
+//    public static void experienceFromBelief(Memory memory, Task task, Task belief) {
+//        //Task T=new Task(belief.clone(),new Budget(task),null);
+//        ///InternalExperienceFromTask(memory,T,false);
+//    }
+
+//    public static void InternalExperienceFromTask(Memory memory, Task task, boolean full) {
+//        if(!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY) {
+//            InternalExperienceFromTaskInternal(memory,task,full);
+//        }
+//    }
+//
+//    public static boolean InternalExperienceFromTaskInternal(Memory memory, Task task, boolean full) {
+//        if(!enabled) {
+//            return false;
+//        }
+//
+//        // if(OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY ||
+//        //         (!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY &amp;&amp; (task.sentence.punctuation==Symbols.QUESTION || task.sentence.punctuation==Symbols.QUEST))) {
+//        {
+//            if(task.sentence.punctuation == Symbols.QUESTION || task.sentence.punctuation == Symbols.QUEST) {
+//                if(task.budget.summary()&lt;MINIMUM_BUDGET_SUMMARY_TO_CREATE_WONDER_EVALUATE) {
+//                    return false;
+//                }
+//            }
+//            else
+//            if(task.budget.summary()&lt;MINIMUM_BUDGET_SUMMARY_TO_CREATE) {
+//                return false;
+//            }
+//        }
+//
+//        Term content=task.getTerm();
+//        // to prevent infinite recursions
+//        if (content instanceof Operation/* ||  Memory.randomNumber.nextDouble()&gt;Global.INTERNAL_EXPERIENCE_PROBABILITY*/) {
+//            return true;
+//        }
+//        Sentence sentence = task.sentence;
+//        TruthValue truth = new DefaultTruth(1.0f, Global.DEFAULT_JUDGMENT_CONFIDENCE);
+//        Stamp stamp = task.sentence.stamp.clone();
+//        stamp.setOccurrenceTime(memory.time());
+//        Term ret=toTerm(sentence, memory);
+//        if (ret==null) {
+//            return true;
+//        }
+//        Sentence j = new Sentence(ret, Symbols.JUDGMENT, truth, stamp);
+//        Budget newbudget=new Budget(
+//                Global.DEFAULT_JUDGMENT_CONFIDENCE*INTERNAL_EXPERIENCE_PRIORITY_MUL,
+//                Global.DEFAULT_JUDGMENT_PRIORITY*INTERNAL_EXPERIENCE_DURABILITY_MUL,
+//                BudgetFunctions.truthToQuality(truth));
+//
+//        if(!OLD_BELIEVE_WANT_EVALUATE_WONDER_STRATEGY) {
+//            newbudget.setPriority(task.getPriority()*INTERNAL_EXPERIENCE_PRIORITY_MUL);
+//            newbudget.setDurability(task.getDurability()*INTERNAL_EXPERIENCE_DURABILITY_MUL);
+//        }
+//
+//        Task newTask = new Task(j, (Budget) newbudget,
+//                full ? null : task);
+//        memory.addNewTask(newTask, &quot;Remembered Action (Internal Experience)&quot;);
+//        return false;
+//    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

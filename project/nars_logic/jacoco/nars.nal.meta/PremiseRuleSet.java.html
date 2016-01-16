@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>PremiseRuleSet.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.meta</a> &gt; <span class="el_source">PremiseRuleSet.java</span></div><h1>PremiseRuleSet.java</h1><pre class="source lang-java linenums">package nars.nal.meta;
+
+import nars.$;
+import nars.Global;
+import nars.Narsese;
+import nars.nal.Deriver;
+import nars.term.compound.Compound;
+import nars.util.data.list.FasterList;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+
+
+/**
+ * Holds an array of derivation rules
+ */
+public class PremiseRuleSet {
+
+<span class="fc" id="L33">    private static final Pattern twoSpacePattern = Pattern.compile(&quot;  &quot;, Pattern.LITERAL);</span>
+<span class="fc" id="L34">    private static final Pattern equivOperatorPattern = Pattern.compile(&quot;&lt;=&gt;&quot;, Pattern.LITERAL);</span>
+<span class="fc" id="L35">    private static final Pattern implOperatorPattern = Pattern.compile(&quot;==&gt;&quot;, Pattern.LITERAL);</span>
+<span class="fc" id="L36">    private static final Pattern conjOperatorPattern = Pattern.compile(&quot;&amp;&amp;&quot;, Pattern.LITERAL);</span>
+<span class="fc" id="L37">    private final List&lt;PremiseRule&gt; premiseRules = new FasterList&lt;&gt;();</span>
+
+
+    public PremiseRuleSet() throws IOException, URISyntaxException {
+<span class="fc" id="L41">        this(Paths.get(Deriver.class.getResource(&quot;default.meta.nal&quot;).toURI()));</span>
+<span class="fc" id="L42">    }</span>
+
+    public PremiseRuleSet(@NotNull Path path) throws IOException {
+<span class="fc" id="L45">        this(Files.readAllLines(path));</span>
+<span class="fc" id="L46">    }</span>
+<span class="fc" id="L47">    public final PatternIndex patterns = new PatternIndex();</span>
+
+
+<span class="fc" id="L50">    private static final Logger logger = LoggerFactory.getLogger(PremiseRuleSet.class);</span>
+
+
+<span class="fc" id="L53">    public PremiseRuleSet(boolean normalize, @NotNull PremiseRule... rules) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (PremiseRule p : rules) {</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (normalize)</span>
+<span class="fc" id="L56">                p = p.normalizeRule(patterns);</span>
+<span class="fc" id="L57">            premiseRules.add(p);</span>
+        }
+<span class="fc" id="L59">    }</span>
+
+<span class="fc" id="L61">    public PremiseRuleSet(@NotNull Collection&lt;String&gt; ruleStrings) {</span>
+<span class="fc" id="L62">        int[] errors = {0};</span>
+
+<span class="fc" id="L64">        parse(load(ruleStrings), patterns).forEach(s -&gt; premiseRules.add(s));</span>
+
+
+<span class="fc" id="L67">        logger.info(&quot;indexed &quot; + premiseRules.size() + &quot; total rules, consisting of &quot; + patterns.size() + &quot; unique pattern components terms&quot;);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (errors[0] &gt; 0) {</span>
+<span class="nc" id="L69">            logger.warn(&quot;\trule errors: &quot; + errors[0]);</span>
+        }
+<span class="fc" id="L71">    }</span>
+
+
+    @NotNull
+    static List&lt;String&gt; load(@NotNull Iterable&lt;String&gt; lines) {
+
+<span class="fc" id="L77">        List&lt;String&gt; unparsed_rules = Global.newArrayList(1024);</span>
+
+<span class="fc" id="L79">        StringBuilder current_rule = new StringBuilder();</span>
+<span class="fc" id="L80">        boolean single_rule_test = false;</span>
+
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (String s : lines) {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (s.startsWith(&quot;try:&quot;)) {</span>
+<span class="nc" id="L84">                single_rule_test = true;</span>
+<span class="nc" id="L85">                break;</span>
+            }
+<span class="fc" id="L87">        }</span>
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (String s : lines) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            boolean currentRuleEmpty = current_rule.length() == 0;</span>
+
+<span class="fc bfc" id="L92" title="All 4 branches covered.">            if (s.startsWith(&quot;//&quot;) || spacePattern.matcher(s).replaceAll(Matcher.quoteReplacement(&quot;&quot;)).isEmpty()) {</span>
+
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                if (!currentRuleEmpty) {</span>
+
+<span class="pc bpc" id="L96" title="5 of 6 branches missed.">                    if (!single_rule_test || single_rule_test &amp;&amp; current_rule.toString().contains(&quot;try:&quot;)) {</span>
+<span class="fc" id="L97">                        unparsed_rules.add(current_rule.toString().trim().replace(&quot;try:&quot;, &quot;&quot;)); //rule is finished, add it</span>
+                    }
+<span class="fc" id="L99">                    current_rule.setLength(0); //start identifying a new rule</span>
+                }
+
+            } else {
+                //note, it can also be that the current_rule is not empty and this line contains |- which means
+                //its already a new rule, in which case the old rule has to be added before we go on
+<span class="fc bfc" id="L105" title="All 4 branches covered.">                if (!currentRuleEmpty &amp;&amp; s.contains(&quot;|-&quot;)) {</span>
+
+<span class="pc bpc" id="L107" title="5 of 6 branches missed.">                    if (!single_rule_test || single_rule_test &amp;&amp; current_rule.toString().contains(&quot;try:&quot;)) {</span>
+<span class="fc" id="L108">                        unparsed_rules.add(current_rule.toString().trim().replace(&quot;try:&quot;, &quot;&quot;)); //rule is finished, add it</span>
+                    }
+<span class="fc" id="L110">                    current_rule.setLength(0); //start identifying a new rule</span>
+
+                }
+<span class="fc" id="L113">                current_rule.append(s).append('\n');</span>
+            }
+<span class="fc" id="L115">        }</span>
+
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (current_rule.length() &gt; 0) {</span>
+<span class="pc bpc" id="L118" title="5 of 6 branches missed.">            if (!single_rule_test || single_rule_test &amp;&amp; current_rule.toString().contains(&quot;try:&quot;)) {</span>
+<span class="fc" id="L119">                unparsed_rules.add(current_rule.toString());</span>
+            }
+        }
+
+<span class="fc" id="L123">        return unparsed_rules;</span>
+    }
+
+    @Deprecated /* soon */ static String preprocess(String rule) //minor things like Truth.Comparison -&gt; Truth_Comparison
+    {
+
+<span class="fc" id="L129">        String ret = '&lt;' + rule + '&gt;';</span>
+
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        while (ret.contains(&quot;  &quot;)) {</span>
+<span class="fc" id="L132">            ret = twoSpacePattern.matcher(ret).replaceAll(Matcher.quoteReplacement(&quot; &quot;));</span>
+        }
+
+<span class="fc" id="L135">        ret = ret.replace(&quot;A..&quot;, &quot;%A..&quot;); //add var pattern manually to ellipsis</span>
+<span class="fc" id="L136">        ret = ret.replace(&quot;%A..B=_&quot;, &quot;%A..%B=_&quot;); //add var pattern manually to ellipsis</span>
+<span class="fc" id="L137">        ret = ret.replace(&quot;B..&quot;, &quot;%B..&quot;); //add var pattern manually to ellipsis</span>
+<span class="fc" id="L138">        ret = ret.replace(&quot;%A.._=B&quot;, &quot;%A.._=%B&quot;); //add var pattern manually to ellipsis</span>
+
+<span class="fc" id="L140">        return ret.replace(&quot;\n&quot;, &quot;&quot;);/*.replace(&quot;A_1..n&quot;,&quot;\&quot;A_1..n\&quot;&quot;)*/ //TODO: implement A_1...n notation, needs dynamic term construction before matching</span>
+    }
+
+
+<span class="fc" id="L144">    private static final String[] equFull = {&quot;&lt;=&gt;&quot;/*, &quot;&lt;/&gt;&quot;, &quot;&lt;|&gt;&quot;*/};</span>
+<span class="fc" id="L145">    private static final String[] implFull = {&quot;==&gt;&quot;/*, &quot;=/&gt;&quot; , &quot;=|&gt;&quot;, &quot;=\\&gt;&quot;*/};</span>
+<span class="fc" id="L146">    private static final String[] conjFull = {&quot;&amp;&amp;&quot;/*, &quot;&amp;|&quot;, &quot;&amp;/&quot;*/};</span>
+    @Nullable
+<span class="fc" id="L148">    private static final String[] unchanged = {null};</span>
+
+    /**
+     * //TODO do this on the parsed rule, because string contents could be unpredictable:
+     * permute(rule, Map&lt;Op,Op[]&gt; alternates)
+     *
+     * @param rules
+     * @param ruleString
+     */
+    static void permuteTenses(@NotNull Collection&lt;String&gt; rules /* results collection */,
+                              @NotNull String ruleString) {
+
+        //Original version which permutes in different tenses
+
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (!ruleString.contains(&quot;Order:ForAllSame&quot;)) {</span>
+<span class="fc" id="L163">            rules.add(ruleString);</span>
+<span class="fc" id="L164">            return;</span>
+        }
+
+<span class="fc" id="L167">        String[] equs =</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                ruleString.contains(&quot;&lt;=&gt;&quot;) ?</span>
+<span class="fc" id="L169">                        equFull :</span>
+<span class="fc" id="L170">                        unchanged;</span>
+
+
+<span class="fc" id="L173">        String[] impls =</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                ruleString.contains(&quot;==&gt;&quot;) ?</span>
+<span class="fc" id="L175">                        implFull :</span>
+<span class="fc" id="L176">                        unchanged;</span>
+
+<span class="fc" id="L178">        String[] conjs =</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                ruleString.contains(&quot;&amp;&amp;&quot;) ?</span>
+<span class="fc" id="L180">                        conjFull :</span>
+<span class="fc" id="L181">                        unchanged;</span>
+
+
+<span class="fc" id="L184">        rules.add(ruleString);</span>
+
+
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (String equ : equs) {</span>
+
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            String p1 = equ != null ? equivOperatorPattern.matcher(ruleString).replaceAll(Matcher.quoteReplacement(equ)) : ruleString;</span>
+
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            for (String imp : impls) {</span>
+
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                String p2 = imp != null ? implOperatorPattern.matcher(p1).replaceAll(Matcher.quoteReplacement(imp)) : p1;</span>
+
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                for (String conj : conjs) {</span>
+
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                    String p3 = conj != null ? conjOperatorPattern.matcher(p2).replaceAll(Matcher.quoteReplacement(conj)) : p2;</span>
+
+<span class="fc" id="L199">                    rules.add(p3);</span>
+                }
+            }
+        }
+
+
+<span class="fc" id="L205">    }</span>
+
+
+    @NotNull
+    static Set&lt;PremiseRule&gt; parse(@NotNull Collection&lt;String&gt; rawRules, @NotNull PatternIndex index) {
+
+
+<span class="fc" id="L212">        Set&lt;String&gt; expanded = new HashSet(rawRules.size() * 4); //Global.newHashSet(1); //new ConcurrentSkipListSet&lt;&gt;();</span>
+
+
+<span class="fc" id="L215">        rawRules/*.parallelStream()*/.forEach(rule -&gt; {</span>
+
+<span class="fc" id="L217">            String p = preprocess(rule);</span>
+
+
+            //there might be now be A_1..maxVarArgsToMatch in it, if this is the case we have to add up to maxVarArgsToMatch ur
+            /*if (p.contains(&quot;A_1..n&quot;) || p.contains(&quot;A_1..A_i.substitute(_)..A_n&quot;)) {
+                addUnrolledVarArgs(expanded, p, maxVarArgsToMatch);
+            } else {*/
+<span class="fc" id="L224">            permuteTenses(expanded, p);</span>
+
+
+
+<span class="fc" id="L228">        });//.forEachOrdered(s -&gt; expanded.addAll(s));</span>
+
+
+<span class="fc" id="L231">        Set&lt;PremiseRule&gt; ur = Global.newHashSet(rawRules.size()*4);</span>
+        //ListMultimap&lt;TaskRule, TaskRule&gt; ur = MultimapBuilder.linkedHashKeys().arrayListValues().build();
+
+
+        //accumulate these in a set to eliminate duplicates
+<span class="fc" id="L236">        expanded.forEach(src -&gt; {</span>
+            try {
+
+
+<span class="fc" id="L240">                PremiseRule preNorm = new PremiseRule((Compound) Narsese.the().term(src, $.terms, false /* raw */));</span>
+
+<span class="fc" id="L242">                PremiseRule r = add(ur, preNorm, src, index);</span>
+
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                if (r.allowBackward)</span>
+<span class="fc" id="L245">                    addQuestions(ur, r, src, index);</span>
+
+<span class="fc" id="L247">                PremiseRule f = r.forwardPermutation();</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                if (r.allowBackward)</span>
+<span class="fc" id="L249">                    addQuestions(ur, f, src, index);</span>
+<span class="fc" id="L250">                add(ur, f, src, index);</span>
+
+
+<span class="nc" id="L253">            } catch (Exception ex) {</span>
+<span class="nc" id="L254">                logger.error(&quot;Invalid TaskRule: {}&quot;, ex);</span>
+<span class="nc" id="L255">                ex.printStackTrace();</span>
+<span class="fc" id="L256">            }</span>
+<span class="fc" id="L257">        });</span>
+
+<span class="fc" id="L259">        return ur;</span>
+    }
+
+    private static void addQuestions(@NotNull Collection&lt;PremiseRule&gt; target, @NotNull PremiseRule r, String src, @NotNull PatternIndex patterns) {
+
+<span class="fc" id="L264">        r.forEachQuestionReversal((q,reason) -&gt; add(target, q, src + &quot;//&quot; + reason, patterns));</span>
+
+<span class="fc" id="L266">     }</span>
+
+    @Nullable
+    static PremiseRule add(@NotNull Collection&lt;PremiseRule&gt; target, @Nullable PremiseRule q, String src, @NotNull PatternIndex index) {
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (q == null)</span>
+<span class="nc" id="L271">            throw new RuntimeException(&quot;null: &quot; + q + ' ' + src);</span>
+
+<span class="fc" id="L273">        q = q.normalizeRule(index).setup(index);</span>
+<span class="fc" id="L274">        q.setSource(src);</span>
+<span class="fc" id="L275">        target.add(q);</span>
+<span class="fc" id="L276">        return q;</span>
+    }
+<span class="fc" id="L278">    private static final Pattern spacePattern = Pattern.compile(&quot; &quot;, Pattern.LITERAL);</span>
+
+    @NotNull
+    public List&lt;PremiseRule&gt; getPremiseRules() {
+<span class="fc" id="L282">        return premiseRules;</span>
+        //return Collections.unmodifiableList(premiseRules);
+    }
+
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,610 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>DerivationGraph.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.meter</a> &gt; <span class="el_source">DerivationGraph.java</span></div><h1>DerivationGraph.java</h1><pre class="source lang-java linenums">package nars.util.meter;
+
+import com.google.common.collect.Iterables;
+import com.gs.collections.impl.map.mutable.primitive.ObjectIntHashMap;
+import com.gs.collections.impl.tuple.Tuples;
+import nars.Premise;
+import nars.concept.Concept;
+import nars.concept.ConceptProcess;
+import nars.nal.nal8.AbstractOperator;
+import nars.nar.Terminal;
+import nars.task.Task;
+import nars.term.Term;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import nars.term.variable.Variable;
+import nars.util.Texts;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jgrapht.ext.*;
+import org.jgrapht.graph.DirectedMaskSubgraph;
+import org.jgrapht.graph.DirectedPseudograph;
+import org.jgrapht.graph.MaskFunctor;
+
+import java.io.Writer;
+import java.util.*;
+
+/**
+ * table for holding derivation results for online &amp; offline
+ * testing and analysis
+ *
+ * associates an input condition to different instances of output results
+ *
+ * input:
+ *      concept
+ *      tasklink
+ *      termlink (optional)
+ *
+ * output(s):
+ *      list of new tasks derived
+ *
+ * terms are stored with their names normalized to generic values, ex;
+ * &lt;(*,&lt;A --&gt; B&gt;,(--,C)) --&gt; D&gt;
+ *
+ * TODO add all removed tasks and their reasons as extra metadata
+ */
+public class DerivationGraph extends DirectedPseudograph&lt;DerivationGraph.Keyed,Object&gt; {
+
+    @NotNull
+    public static String tenseRelative(long then, long now) {
+<span class="nc" id="L50">        long dt = then - now;</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        return dt &lt; 0 ? &quot;[&quot; + dt + ']' : &quot;[+&quot; + dt + ']';</span>
+    }
+
+    public static class DerivationPattern extends Keyed  {
+
+
+        //  premise key
+        public final PremiseKey key;
+
+
+        //  example premises (incl optional NL labels (NLP training) per task)
+        //public final Set&lt;Premise&gt; examplePremises = new HashSet();
+        //Pair&lt;Premise,Task..
+
+        //  results
+<span class="nc" id="L66">        public final Set&lt;TaskResult&gt; actual = new HashSet();</span>
+
+        //  expected results
+        //public final Set&lt;Task&gt; expected = new HashSet();
+
+<span class="nc" id="L71">        public DerivationPattern(PremiseKey key) {</span>
+<span class="nc" id="L72">            this.key = key;</span>
+<span class="nc" id="L73">        }</span>
+
+        @Override
+        public String name() {
+<span class="nc" id="L77">            return key.toString();</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L82">            return key.hashCode();</span>
+        }
+
+        @Override
+        public boolean equals(Object o) {
+<span class="nc" id="L87">            return key.equals(o);</span>
+        }
+
+
+
+
+    }
+
+    @NotNull
+    public final Map&lt;PremiseKey, DerivationPattern&gt; premiseResult;
+//    Map&lt;Object,Double&gt; edgeWeights = Global.newHashMap();
+
+    private final boolean includeDerivedBudget;
+    private final boolean includeDerivedTruth;
+//    private final boolean includeDerivedParents = true;
+
+
+<span class="nc" id="L104">    static final Terminal np = new Terminal();</span>
+<span class="nc" id="L105">    static final Map&lt;String, String&gt; parsedTerm = new HashMap(1024);</span>
+
+    public DerivationPattern add(@NotNull ConceptProcess n, Task... derived) {
+<span class="nc" id="L108">        return add(n.getConcept(), n.taskLink.get(),</span>
+<span class="nc" id="L109">                n.termLink.get().term(),</span>
+<span class="nc" id="L110">                n.getBelief(), n.time(), derived);</span>
+    }
+
+//    public DerivationPattern addExpected(ConceptProcess n, Task... expected) {
+//        DerivationPattern p = add(n);
+//        Collections.addAll(p.expected, expected);
+//        return p;
+//    }
+
+    public DerivationPattern add(Concept c, @NotNull Task tasklink, @Nullable Term termlink, @Nullable Task belief, long now, @NotNull Task... result) {
+
+<span class="nc" id="L121">        ObjectIntHashMap&lt;Term&gt; unique = new ObjectIntHashMap();</span>
+
+<span class="nc" id="L123">        PremiseKey premise = newPremise(tasklink.getTask(),</span>
+                termlink, belief, unique, now);
+
+<span class="nc" id="L126">        addVertex(premise);</span>
+
+//        TermPattern conceptTerm = addTermPattern(c.getTerm(), unique);
+//        newEdge(conceptTerm, premise);
+
+<span class="nc" id="L131">        TermPattern taskLinkTerm = addTermPattern(tasklink.term(), unique);</span>
+        //TaskPattern taskLinkTask = addSentencePattern(tasklink.getTask(), unique, now);
+
+        /*addEdge(taskLinkTerm, taskLinkTask);
+        addEdge(taskLinkTask, premise);*/
+
+<span class="nc" id="L137">        addEdge(taskLinkTerm, premise);</span>
+
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (termlink!=null) {</span>
+<span class="nc" id="L140">            TermPattern termLinkTerm = addTermPattern(termlink, unique);</span>
+<span class="nc" id="L141">            addEdge(termLinkTerm, premise);</span>
+        }
+
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (belief!=null) {</span>
+<span class="nc" id="L145">            TermPattern beliefTerm = addTermPattern(belief.term(), unique);</span>
+<span class="nc" id="L146">            addEdge(beliefTerm, premise);</span>
+        }
+
+<span class="nc" id="L149">        Set&lt;TaskResult&gt; resultSet = new TreeSet(); //order</span>
+
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        for (Task t : result) {</span>
+
+<span class="nc" id="L153">            TaskResult tr = new TaskResult(t, unique, now, includeDerivedTruth, includeDerivedBudget);</span>
+<span class="nc" id="L154">            TermPattern tp = addTermPattern(t.term(), unique);</span>
+
+            /*addVertex(tr);
+            addEdge(premise, tr);
+            addEdge(tr, tp);*/
+
+<span class="nc" id="L160">            addEdge(premise, tp);</span>
+
+            /*newEdge(tr, sp);
+            newEdge(sp, tp);*/
+
+<span class="nc" id="L165">            resultSet.add(tr);</span>
+
+        }
+
+<span class="nc" id="L169">        DerivationPattern pattern = premiseResult.computeIfAbsent(premise, (p) -&gt; new DerivationPattern(premise));</span>
+<span class="nc" id="L170">        pattern.actual.addAll(resultSet);</span>
+
+<span class="nc" id="L172">        addVertex(pattern);</span>
+<span class="nc" id="L173">        addEdge(premise, pattern);</span>
+<span class="nc" id="L174">        addEdge(pattern, premise);</span>
+
+<span class="nc" id="L176">        return pattern;</span>
+
+    }
+
+
+    /** this normalizes any commutative terms which are out of order, and caches them in a list to avoid reparsing */
+    public static String parseTerm(String i) {
+<span class="nc" id="L183">        String s = parsedTerm.get(i);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L185">            s = np.term(i).term().toStringCompact();</span>
+
+<span class="nc" id="L187">            parsedTerm.put(i, s);</span>
+        }
+<span class="nc" id="L189">        return s;</span>
+    }
+
+    public DerivationGraph(boolean includeDerivedBudget, boolean includeDerivedTruth) {
+<span class="nc" id="L193">        super(Tuples::twin);</span>
+
+<span class="nc" id="L195">        premiseResult =</span>
+                new TreeMap();
+                //Global.newHashMap();
+
+
+<span class="nc" id="L200">        this.includeDerivedBudget = includeDerivedBudget;</span>
+<span class="nc" id="L201">        this.includeDerivedTruth = includeDerivedTruth;</span>
+<span class="nc" id="L202">    }</span>
+
+    public int size() {
+<span class="nc" id="L205">        return premiseResult.size();</span>
+    }
+
+//    public void print(String filePath) throws FileNotFoundException {
+//        print(new PrintStream(new FileOutputStream(new File(filePath))));
+//    }
+
+<span class="nc" id="L212">    public abstract static class Keyed implements Comparable&lt;Keyed&gt; {</span>
+
+        public abstract String name();
+
+        @Override
+        public String toString() {
+<span class="nc" id="L218">            return name();</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L223">            return name().hashCode();</span>
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">            if (obj instanceof Keyed) {</span>
+<span class="nc" id="L229">                return name().equals(((Keyed) obj).name());</span>
+            }
+<span class="nc" id="L231">            return false;</span>
+        }
+
+        @Override
+        public int compareTo(@NotNull Keyed o) {
+<span class="nc" id="L236">            return name().compareTo(o.name());</span>
+        }
+
+    }
+
+    public static class PremiseKey extends Keyed  {
+
+        //private final String conceptKey;
+        @NotNull
+        private final String taskLinkKey;
+        @NotNull
+        private final String termLinkKey;
+        @NotNull
+        public final String key;
+        @NotNull
+        private final String beliefKey;
+        private final int beliefVolume;
+        private final int taskVolume;
+        private final int termVolume;
+
+
+<span class="nc" id="L257">        public PremiseKey(@NotNull Task tasklink, @Nullable Term termlink, @Nullable Task belief, ObjectIntHashMap&lt;Term&gt; unique, long now, boolean truth, boolean budget) {</span>
+            //this.conceptKey = genericString(concept.getTerm(), unique);
+<span class="nc" id="L259">            taskLinkKey = genericString(tasklink, unique, now, truth, budget, false);</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            termLinkKey = termlink == null ? &quot;_&quot; : genericString(termlink, unique);</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            beliefKey = belief == null ? &quot;_&quot; : genericString(belief, unique, now, truth, budget, false);</span>
+
+<span class="nc" id="L263">            taskVolume = tasklink.term().volume();</span>
+<span class="nc" id="L264">            termVolume = termlink.term().volume();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            beliefVolume = (belief!=null) ? belief.term().volume() : 0;</span>
+
+<span class="nc" id="L267">            key = (taskLinkKey + ':' +</span>
+                    termLinkKey + ':' +
+<span class="nc" id="L269">                    beliefKey).trim();</span>
+<span class="nc" id="L270">        }</span>
+
+        @NotNull
+        @Override
+<span class="nc" id="L274">        public String name() { return key; }</span>
+
+        @Override
+        public boolean equals(Object obj) {
+<span class="nc bnc" id="L278" title="All 2 branches missed.">            if (this == obj) return true;</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            if (obj instanceof PremiseKey) {</span>
+<span class="nc" id="L280">                return name().equals(((PremiseKey)obj).name());</span>
+            }
+<span class="nc" id="L282">            return false;</span>
+        }
+
+        @Override
+        public int compareTo(Keyed o) {
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            if (o instanceof PremiseKey) {</span>
+<span class="nc" id="L288">                PremiseKey pk = (PremiseKey)o;</span>
+<span class="nc" id="L289">                int i = Integer.compare(taskVolume, pk.taskVolume);</span>
+<span class="nc bnc" id="L290" title="All 2 branches missed.">                if (i != 0) return i;</span>
+<span class="nc" id="L291">                int j = Integer.compare(termVolume, pk.termVolume);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                if (j != 0) return j;</span>
+<span class="nc" id="L293">                int k = Integer.compare(beliefVolume, pk.beliefVolume);</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                if (k != 0) return k;</span>
+<span class="nc" id="L295">                return super.compareTo(o);</span>
+            }
+<span class="nc" id="L297">            return super.compareTo(o);</span>
+        }
+    }
+
+
+    public static class TaskResult extends Keyed {
+
+        @NotNull
+        public final String key;
+
+<span class="nc" id="L307">        public TaskResult(@NotNull Task t, ObjectIntHashMap&lt;Term&gt; unique, long now, boolean includeDerivedTruth, boolean includeDerivedBudget) {</span>
+<span class="nc" id="L308">            key = genericString(t, unique, now, includeDerivedTruth, includeDerivedBudget, false);</span>
+<span class="nc" id="L309">        }</span>
+
+        @NotNull
+        @Override
+        public String name() {
+<span class="nc" id="L314">            return key;</span>
+        }
+
+    }
+
+
+    public static class TermPattern extends Keyed {
+
+        public final String key;
+
+<span class="nc" id="L324">        public TermPattern(@NotNull Term t, ObjectIntHashMap&lt;Term&gt; unique) {</span>
+<span class="nc" id="L325">            key = genericString(t, unique);</span>
+<span class="nc" id="L326">        }</span>
+
+        @Override
+        public String name() {
+<span class="nc" id="L330">            return key;</span>
+        }
+
+    }
+
+    public static class TaskPattern extends Keyed {
+
+        public final String key;
+
+<span class="nc" id="L339">        public TaskPattern(@NotNull Task s, ObjectIntHashMap&lt;Term&gt; unique, long now, boolean includeDerivedTruth) {</span>
+<span class="nc" id="L340">            key = genericString(s, unique, now, includeDerivedTruth);</span>
+<span class="nc" id="L341">        }</span>
+
+        @Override
+        public String name() {
+<span class="nc" id="L345">            return key;</span>
+        }
+
+    }
+
+    @NotNull
+    public PremiseKey newPremise(@NotNull Task tasklink, Term termlink, Task belief, ObjectIntHashMap&lt;Term&gt; unique, long now) {
+<span class="nc" id="L352">        return new PremiseKey(tasklink, termlink, belief, unique, now, includeDerivedTruth, includeDerivedBudget);</span>
+    }
+
+//    public NARReaction record(NAR n) {
+//        return new NARReaction(n, /* Events.TermLinkTransformed.class,
+//                Events.ConceptProcessed.class, Events.TermLinkSelected.class,*/ Events.TaskDerive.class) {
+//
+//            @Override
+//            public void event(Class event, Object[] args) {
+//
+////                if (event == Events.TermLinkTransformed.class) {
+////                    TaskLink tl = (TaskLink)args[0];
+////                    Concept c = (Concept)args[1];
+////                    NAL n = (NAL)args[2];
+////                    result(c, tl, null, null /*n.getNewTasks()*/, n.time()); //TODO see if derivations can be noticed another way
+////                }
+////
+////                else if (event == Events.TermLinkSelected.class) {
+////                    TermLink termlink = (TermLink)args[0];
+////                    ConceptProcess n = (ConceptProcess)args[1];
+////                    TaskLink tasklink = n.getTaskLink();
+////                    Concept c = n.getConcept();
+////                    int taskStart = (int) args[2];
+////                    int taskEnd = (int) args[3];
+////
+////                    result(c, tasklink, termlink, getTasks(n, taskStart, taskEnd), n.time());
+////                }
+////
+//                if (event == Events.TaskDerive.class) {
+//                    //System.out.println(args[0]);
+//                    Task derived = (Task)args[0];
+//                    if (args[1] instanceof ConceptProcess) {
+//                        ConceptProcess n = (ConceptProcess) args[1];
+//                        result(n, Lists.newArrayList(derived));
+//                    }
+//                    else {
+//                        //revision, etc.
+//                    }
+//
+//
+//                }
+//            }
+//        };
+//    }
+
+    @NotNull
+    static Iterable&lt;Task&gt; getTasks(Premise n, int taskStart, int taskEnd) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (taskStart == taskEnd)</span>
+<span class="nc" id="L400">            return Collections.emptyList();</span>
+<span class="nc" id="L401">        return Iterables.limit(Iterables.skip(null /*n.getNewTasks()*/, taskStart), taskEnd - taskStart); //TODO see if derivations can be noticed another way</span>
+    }
+
+
+
+
+    public static String genericString(@NotNull Task t, ObjectIntHashMap&lt;Term&gt; unique, long now, boolean includeDerivedTruth, boolean includeDerivedBudget, boolean includeDerivedParents) {
+<span class="nc" id="L408">        StringBuilder tempTaskString = new StringBuilder(128);</span>
+
+<span class="nc" id="L410">        String s = genericString(t, unique, now, includeDerivedTruth);</span>
+
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (includeDerivedBudget)</span>
+<span class="nc" id="L413">            tempTaskString.append(t.getBudget().toBudgetString());</span>
+
+<span class="nc" id="L415">        tempTaskString.append(s);</span>
+
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (includeDerivedParents)</span>
+<span class="nc" id="L418">            tempTaskString.append(t);</span>
+
+<span class="nc" id="L420">        return tempTaskString.toString();</span>
+    }
+
+
+
+//    @Override
+//    public void setEdgeWeight(Object o, double weight) {
+//        edgeWeights.put(o, weight);
+//    }
+//
+//    @Override
+//    public double getEdgeWeight(Object o) {
+//        return edgeWeights.get(o);
+//    }
+
+//    public final Object newEdge(Keyed a, Keyed b) {
+//        Object edge = a.name() + &quot;||&quot; + b.name();
+//
+//        addEdge(a, b);
+//
+////        if (containsEdge(edge)) {
+////            //setEdgeWeight(edge, getEdgeWeight(edge)+1);
+////        }
+////        else {
+////            addEdge(a, b, edge);
+////            //setEdgeWeight(edge, 1);
+////        }
+//        return edge;
+//    }
+
+
+
+    @NotNull
+    TaskPattern addSentencePattern(@NotNull Task sentence, ObjectIntHashMap&lt;Term&gt; unique, long now) {
+<span class="nc" id="L454">        TaskPattern s = new TaskPattern(sentence, unique, now, includeDerivedTruth);</span>
+<span class="nc" id="L455">        addVertex(s);</span>
+<span class="nc" id="L456">        return s;</span>
+    }
+    @NotNull
+    TermPattern addTermPattern(@NotNull Term term, ObjectIntHashMap&lt;Term&gt; unique) {
+<span class="nc" id="L460">        TermPattern s = new TermPattern(term, unique);</span>
+<span class="nc" id="L461">        addVertex(s);</span>
+<span class="nc" id="L462">        return s;</span>
+    }
+
+
+    public static String genericLiteral(@NotNull Term c, @NotNull ObjectIntHashMap&lt;Term&gt; unique) {
+<span class="nc" id="L467">        c.recurseTerms((t, superterm) -&gt; {</span>
+<span class="nc bnc" id="L468" title="All 4 branches missed.">            if ((t instanceof Atom) &amp;&amp; (!(t instanceof Variable))) {</span>
+<span class="nc" id="L469">                unique.getIfAbsentPut(t, unique.size());</span>
+            }
+<span class="nc" id="L471">        });</span>
+
+        //TODO use a better generation method, replacement might cause error if term names contain common subsequences
+        //maybe use a sorted Map so that the longest terms to be replaced are iterated first, so that a shorter subterm will not interfere with subsequent longer replacement
+
+<span class="nc" id="L476">        String[] s = new String[1];</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">        s[0] = c instanceof Compound ? c.toString(false) : c.toString();</span>
+
+<span class="nc" id="L479">        unique.forEachKeyValue( (tn, i) -&gt; {</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">            if (i &gt; 25) throw new RuntimeException(&quot;TODO support &gt; 26 different unique atomic terms&quot;);</span>
+<span class="nc" id="L481">            String cc = String.valueOf((char) ('A' + i));</span>
+<span class="nc" id="L482">            s[0] = s[0].replace(tn.toString(), cc); //this is replaceAll but without regex</span>
+<span class="nc" id="L483">        });</span>
+
+<span class="nc" id="L485">        s[0] = parseTerm(s[0]);</span>
+
+<span class="nc" id="L487">        return s[0];</span>
+
+    }
+
+    public static String genericString(@NotNull Task s, long now, boolean includeTruth) {
+<span class="nc" id="L492">        return genericString(s, new ObjectIntHashMap&lt;&gt;(), now, includeTruth);</span>
+    }
+
+    public static String genericString(@NotNull Task s, ObjectIntHashMap&lt;Term&gt; unique, long now, boolean includeTruth) {
+<span class="nc" id="L496">        String t = genericString(s.term(), unique);</span>
+
+<span class="nc" id="L498">        t += s.getPunctuation();</span>
+
+
+<span class="nc bnc" id="L501" title="All 2 branches missed.">        if (includeTruth) {</span>
+<span class="nc" id="L502">            t += &quot; %&quot;;</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            t += s.getTruth() != null ? Texts.n2(s.getFrequency()) + &quot;;&quot; + Texts.n2(s.getConfidence()) : &quot;?;?&quot;;</span>
+<span class="nc" id="L504">            t += &quot;%&quot;;</span>
+        }
+
+
+<span class="nc bnc" id="L508" title="All 2 branches missed.">        if (!s.isEternal()) {</span>
+<span class="nc" id="L509">            t += ' ' + tenseRelative(s.getOccurrenceTime(), now);</span>
+        }
+
+<span class="nc" id="L512">        return t;</span>
+    }
+
+    public static String genericString(@NotNull Term t, @Nullable ObjectIntHashMap&lt;Term&gt; _unique) {
+<span class="nc bnc" id="L516" title="All 2 branches missed.">        ObjectIntHashMap&lt;Term&gt; unique = _unique == null ? new ObjectIntHashMap() : _unique;</span>
+
+<span class="nc bnc" id="L518" title="All 2 branches missed.">        if (t.getClass() == Atom.class) {</span>
+            //atomic term
+<span class="nc" id="L520">            return genericLiteral(t, unique);</span>
+        }
+<span class="nc bnc" id="L522" title="All 2 branches missed.">        if (t instanceof AbstractOperator) {</span>
+<span class="nc" id="L523">            return t.toString();</span>
+        }
+<span class="nc bnc" id="L525" title="All 4 branches missed.">        if (t instanceof Variable || t instanceof Compound) {</span>
+            //return t.toString();
+<span class="nc" id="L527">            return genericLiteral(t, unique);</span>
+        }
+
+<span class="nc" id="L530">        throw new RuntimeException(&quot;genericString Unhandled term: &quot; + t);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L535">        return premiseResult.toString();</span>
+    }
+
+    public void print(@NotNull Writer out) {
+
+//        for (PremiseKey premise : premiseResult.keySet()) {
+//            resultGroups = premiseResult.get(premise);
+//            //int g = 0;
+//
+//
+//            if (resultGroups.isEmpty()) {
+//                p.println(premise + &quot;;\t DERIVE; &quot; +  &quot;; null&quot;);
+//            }
+//
+//            for (Set&lt;TaskResult&gt; result : resultGroups) {
+//
+//                if (result.isEmpty()) {
+//                    p.println(premise + &quot;;\t DERIVE; &quot; +  &quot;; null&quot;);
+//                }
+//                else {
+//                    for (TaskResult task : result) {
+//                        p.println(premise + &quot;;\t DERIVE; &quot; +  &quot;; &quot; + task);
+//                    }
+//                }
+//                //g++;
+//            }
+//        }
+//
+//        p.println(vertexSet().size() + &quot; &quot; + edgeSet().size());
+//
+//
+//        SummaryStatistics s = new SummaryStatistics();
+//        for (Double d : edgeWeights.values())
+//            s.addValue(d);
+//        //System.out.println(&quot;weights: &quot; + s);
+
+<span class="nc" id="L571">        GmlExporter gme = new GmlExporter(new IntegerNameProvider(), new StringNameProvider() {</span>
+            @Override
+            public String getVertexName(@NotNull Object vertex) {
+<span class="nc" id="L574">                return super.getVertexName(vertex);</span>
+            }
+<span class="nc" id="L576">        }, new IntegerEdgeNameProvider(), new StringEdgeNameProvider() {</span>
+            @NotNull
+            @Override
+            public String getEdgeName(@NotNull Object edge) {
+<span class="nc" id="L580">                return super.getEdgeName(edge) + &quot;\&quot;\n\tweight \&quot;&quot; + getEdgeWeight(edge) ;</span>
+            }
+        });
+<span class="nc" id="L583">        gme.setPrintLabels(GmlExporter.PRINT_EDGE_VERTEX_LABELS);</span>
+        try {
+<span class="nc" id="L585">            gme.export(out, this);</span>
+
+            //ex: filter:
+                    //weightAtleast(0.5 * (s.getMean() + s.getGeometricMean())));
+<span class="nc" id="L589">        } catch (Exception e) {</span>
+<span class="nc" id="L590">            e.printStackTrace();</span>
+<span class="nc" id="L591">        }</span>
+<span class="nc" id="L592">    }</span>
+
+    @NotNull
+    private DirectedMaskSubgraph weightAtleast(double v) {
+<span class="nc" id="L596">        MaskFunctor e = new MaskFunctor() {</span>
+            @Override
+            public boolean isEdgeMasked(@NotNull Object edge) {
+<span class="nc bnc" id="L599" title="All 2 branches missed.">                return getEdgeWeight(edge) &lt; v;</span>
+            }
+
+            @Override
+            public boolean isVertexMasked(Object vertex) {
+<span class="nc" id="L604">                return false;</span>
+            }
+        };
+<span class="nc" id="L607">        return new DirectedMaskSubgraph(this, e);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

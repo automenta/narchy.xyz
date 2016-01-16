@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ConceptGraph2.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.graph</a> &gt; <span class="el_source">ConceptGraph2.java</span></div><h1>ConceptGraph2.java</h1><pre class="source lang-java linenums">package nars.util.graph;
+
+import nars.Global;
+import nars.NAR;
+import nars.concept.Concept;
+import nars.util.data.ConceptMap;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jgrapht.DirectedGraph;
+import org.jgrapht.EdgeFactory;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Abstract graph model of inter-Concept dynamics.
+ * Uses a concept meta to hold adjacency data
+ * TODO incomplete
+ */
+public abstract class ConceptGraph2&lt;E&gt; extends ConceptMap implements DirectedGraph&lt;Concept,E&gt;, EdgeFactory&lt;Concept,E&gt; {
+
+    @Override
+    public int inDegreeOf(Concept vertex) {
+<span class="nc" id="L25">        return 0;</span>
+    }
+
+    @Nullable
+    @Override
+    public Set&lt;E&gt; incomingEdgesOf(Concept vertex) {
+<span class="nc" id="L31">        return null;</span>
+    }
+
+    @Override
+    public int outDegreeOf(Concept vertex) {
+<span class="nc" id="L36">        return 0;</span>
+    }
+
+    @Nullable
+    @Override
+    public Set&lt;E&gt; outgoingEdgesOf(Concept vertex) {
+<span class="nc" id="L42">        return null;</span>
+    }
+
+<span class="nc" id="L45">    static class Vertex&lt;E&gt; {</span>
+
+<span class="nc" id="L47">        public enum EdgeSet {</span>
+<span class="nc" id="L48">            Incoming, Outgoing</span>
+        }
+
+        public Map&lt;Concept, E&gt; incoming;
+        public Map&lt;Concept, E&gt; outgoing;
+
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        protected void ensureIncoming() {  if (incoming == null)  incoming = Global.newHashMap();       }</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        protected void ensureOutgoing() { if (outgoing == null) outgoing = Global.newHashMap();        }</span>
+
+
+
+        public void addEdge(Concept target, E e, @NotNull EdgeSet set) {
+<span class="nc bnc" id="L60" title="All 3 branches missed.">            switch (set) {</span>
+                case Incoming:
+<span class="nc" id="L62">                    ensureIncoming();</span>
+<span class="nc" id="L63">                    incoming.put(target, e);</span>
+<span class="nc" id="L64">                    break;</span>
+                case Outgoing:
+<span class="nc" id="L66">                    ensureOutgoing();</span>
+<span class="nc" id="L67">                    outgoing.put(target, e);</span>
+                    break;
+            }
+<span class="nc" id="L70">        }</span>
+
+        @Nullable
+        public E removeEdge(Concept target, @NotNull EdgeSet set) {
+<span class="nc bnc" id="L74" title="All 3 branches missed.">            switch (set) {</span>
+                case Incoming:
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                    if (incoming!=null)</span>
+<span class="nc" id="L77">                        return incoming.remove(target);</span>
+                    break;
+                case Outgoing:
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                    if (outgoing!=null)</span>
+<span class="nc" id="L81">                        return outgoing.remove(target);</span>
+                    break;
+            }
+<span class="nc" id="L84">            return null;</span>
+        }
+    }
+
+    protected ConceptGraph2(@NotNull NAR nar) {
+<span class="nc" id="L89">        super(nar);</span>
+<span class="nc" id="L90">    }</span>
+
+    @Override
+    public abstract boolean contains(Concept c);
+
+    @Override
+    protected boolean onConceptForget(Concept c) {
+        //TODO maybe should check whether graph contains it
+<span class="nc" id="L98">        return true;</span>
+    }
+
+    @Override
+    protected boolean onConceptActive(@NotNull Concept c) {
+<span class="nc" id="L103">        c.put(this, new Vertex());</span>
+<span class="nc" id="L104">        return true;</span>
+    }
+
+
+    @NotNull
+    @Override
+    public abstract E createEdge(Concept source, Concept target);
+
+    @Nullable
+    @Override
+    public Set&lt;E&gt; getAllEdges(Concept sourceVertex, Concept targetVertex) {
+<span class="nc" id="L115">        return null;</span>
+    }
+
+    @Nullable
+    @Override
+    public E getEdge(Concept sourceVertex, Concept targetVertex) {
+<span class="nc" id="L121">        return null;</span>
+    }
+
+    @Nullable
+    @Override
+    public EdgeFactory&lt;Concept, E&gt; getEdgeFactory() {
+<span class="nc" id="L127">        return null;</span>
+    }
+
+    @NotNull
+    @Override
+    public E addEdge(@NotNull Concept source, @NotNull Concept target) {
+<span class="nc" id="L133">        E e = createEdge(source, target);</span>
+<span class="nc" id="L134">        Vertex sv = source.get(this);</span>
+<span class="nc" id="L135">        Vertex tv = target.get(this);</span>
+<span class="nc" id="L136">        sv.addEdge(target, e, Vertex.EdgeSet.Outgoing);</span>
+<span class="nc" id="L137">        tv.addEdge(source, e, Vertex.EdgeSet.Incoming);</span>
+<span class="nc" id="L138">        return e;</span>
+    }
+
+    @Override
+    public boolean addEdge(Concept sourceVertex, Concept targetVertex, E e) {
+<span class="nc" id="L143">        return false;</span>
+    }
+
+    @Override
+    public boolean addVertex(Concept concept) {
+<span class="nc" id="L148">        return false;</span>
+    }
+
+    @Override
+    public boolean containsEdge(Concept sourceVertex, Concept targetVertex) {
+<span class="nc" id="L153">        return false;</span>
+    }
+
+    @Override
+    public boolean containsEdge(E e) {
+<span class="nc" id="L158">        return false;</span>
+    }
+
+    @Override
+    public boolean containsVertex(Concept concept) {
+<span class="nc" id="L163">        return false;</span>
+    }
+
+    @Nullable
+    @Override
+    public Set&lt;E&gt; edgeSet() {
+<span class="nc" id="L169">        return null;</span>
+    }
+
+    @Nullable
+    @Override
+    public Set&lt;E&gt; edgesOf(Concept vertex) {
+<span class="nc" id="L175">        return null;</span>
+    }
+
+    @Override
+    public boolean removeAllEdges(Collection&lt;? extends E&gt; edges) {
+<span class="nc" id="L180">        return false;</span>
+    }
+
+    @Nullable
+    @Override
+    public Set&lt;E&gt; removeAllEdges(Concept sourceVertex, Concept targetVertex) {
+<span class="nc" id="L186">        return null;</span>
+    }
+
+    @Override
+    public boolean removeAllVertices(Collection&lt;? extends Concept&gt; vertices) {
+<span class="nc" id="L191">        return false;</span>
+    }
+
+    @Nullable
+    @Override
+    public E removeEdge(@NotNull Concept source, @NotNull Concept target) {
+<span class="nc" id="L197">        Vertex&lt;E&gt; sv = source.get(this);</span>
+<span class="nc" id="L198">        Vertex&lt;E&gt; tv = target.get(this);</span>
+<span class="nc" id="L199">        E x1 = sv.removeEdge(target, Vertex.EdgeSet.Outgoing);</span>
+<span class="nc" id="L200">        E x2 = tv.removeEdge(source, Vertex.EdgeSet.Incoming);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (x1!=x2)</span>
+<span class="nc" id="L202">            throw new RuntimeException(&quot;graph fault, different edge instance between &quot; + source + &quot; and &quot; + target);</span>
+<span class="nc" id="L203">        return x1;</span>
+    }
+
+    @Override
+    public boolean removeEdge(E e) {
+<span class="nc" id="L208">        return false;</span>
+    }
+
+    @Override
+    public boolean removeVertex(Concept concept) {
+<span class="nc" id="L213">        return false;</span>
+    }
+
+    @Nullable
+    @Override
+    public Set&lt;Concept&gt; vertexSet() {
+<span class="nc" id="L219">        return null;</span>
+    }
+
+    @Nullable
+    @Override
+    public Concept getEdgeSource(E e) {
+<span class="nc" id="L225">        return null;</span>
+    }
+
+    @Nullable
+    @Override
+    public Concept getEdgeTarget(E e) {
+<span class="nc" id="L231">        return null;</span>
+    }
+
+    @Override
+    public double getEdgeWeight(E e) {
+<span class="nc" id="L236">        return 0;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

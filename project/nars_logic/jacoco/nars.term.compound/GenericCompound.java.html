@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>GenericCompound.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.compound</a> &gt; <span class="el_source">GenericCompound.java</span></div><h1>GenericCompound.java</h1><pre class="source lang-java linenums">package nars.term.compound;
+
+import com.gs.collections.api.block.predicate.primitive.IntObjectPredicate;
+import nars.Op;
+import nars.nal.Tense;
+import nars.term.Term;
+import nars.term.TermPrinter;
+import nars.term.TermVector;
+import nars.term.Termed;
+import nars.util.data.Util;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.function.Consumer;
+
+import static nars.nal.Tense.ITERNAL;
+
+
+public class GenericCompound&lt;T extends Term&gt; implements Compound&lt;T&gt; {
+
+    public final Op op;
+
+    /** subterm vector */
+    @NotNull
+    public final TermVector&lt;T&gt; terms;
+
+    /** subterm relation, resolves to unique concept */
+    public final int relation;
+
+    /** temporal relation (dt), resolves to same concept */
+    public final int t;
+
+
+    private final transient int hash;
+<span class="fc" id="L37">    private transient boolean normalized = false;</span>
+
+
+    public GenericCompound(Op op, @NotNull TermVector subterms) {
+<span class="fc" id="L41">        this(op, -1, subterms);</span>
+<span class="fc" id="L42">    }</span>
+
+    public GenericCompound(Op op, int relation, @NotNull TermVector subterms) {
+<span class="fc" id="L45">        this(op, relation, Tense.ITERNAL, subterms);</span>
+<span class="fc" id="L46">    }</span>
+
+<span class="fc" id="L48">    public GenericCompound(Op op, int relation, int t, @NotNull TermVector subterms) {</span>
+<span class="fc" id="L49">        this.terms = subterms;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        this.normalized = (subterms.vars() == 0);</span>
+<span class="fc" id="L51">        this.op = op;</span>
+
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        t = op().isTemporal() ? t : ITERNAL;</span>
+<span class="fc" id="L54">        this.t = t;</span>
+
+<span class="fc" id="L56">        this.relation = relation;</span>
+
+<span class="fc" id="L58">        this.hash = Util.hashCombine(terms.hashCode(), opRel(), t);</span>
+
+
+<span class="fc" id="L61">    }</span>
+
+//    protected GenericCompound(GenericCompound copy, int newT) {
+//        this.terms = copy.terms;
+//        this.normalized = copy.normalized;
+//        this.op = copy.op;
+//        this.relation = copy.relation;
+//        this.hash = copy.
+//    }
+
+    @Override
+    public final Op op() {
+<span class="fc" id="L73">        return op;</span>
+    }
+
+
+    @Override
+    public final boolean isCommutative() {
+<span class="fc" id="L79">        return op.isCommutative();</span>
+    }
+
+    @Override
+    public final void append(@NotNull Appendable p, boolean pretty) throws IOException {
+<span class="fc" id="L84">        TermPrinter.append(this, p, pretty);</span>
+<span class="fc" id="L85">    }</span>
+
+    @Override public Compound anonymous() {
+<span class="fc" id="L88">        return this.t(ITERNAL);</span>
+    }
+
+    @Override
+    public int compareTo(@NotNull Object o) {
+<span class="fc" id="L93">        int r=0;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (this != o) {</span>
+<span class="fc" id="L95">            Termed t = (Termed) o;</span>
+            //int diff = op().compareTo(t.op());
+<span class="fc" id="L97">            int diff = Integer.compare(op().ordinal(), t.op().ordinal());</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (diff != 0) r = diff;</span>
+            else {
+
+<span class="fc" id="L101">                Compound c = (Compound) (t.term());</span>
+<span class="fc" id="L102">                int diff2 = Integer.compare(relation(), c.relation());</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (diff2 != 0) return diff2;</span>
+
+<span class="fc" id="L105">                int diff3 = Integer.compare(this.t, c.t());</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                if (diff3 != 0) return diff3;</span>
+
+<span class="fc" id="L108">                r=subterms().compareTo(c.subterms());</span>
+            }
+        }
+
+<span class="fc" id="L112">        return r;</span>
+    }
+
+
+    @Override
+    public final void addAllTo(@NotNull Collection&lt;Term&gt; set) {
+<span class="fc" id="L118">        terms.addAllTo(set);</span>
+<span class="fc" id="L119">    }</span>
+
+    @NotNull
+    @Override
+    public final TermVector&lt;T&gt; subterms() {
+<span class="fc" id="L124">        return terms;</span>
+    }
+
+    @Override
+    public boolean equals(@NotNull Object that) {
+<span class="fc bfc" id="L129" title="All 6 branches covered.">        return this == that || hashCode() == that.hashCode() &amp;&amp; equalsFurther((Termed) that);</span>
+    }
+
+    private boolean equalsFurther(@NotNull Termed thatTerm) {
+
+<span class="fc" id="L134">        boolean r=false;</span>
+<span class="fc" id="L135">        Term u = thatTerm.term();</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if ((op == u.op()) /*&amp;&amp; (((t instanceof Compound))*/) {</span>
+<span class="fc" id="L137">            Compound c = (Compound) u;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            r=terms.equals(c.subterms())</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                    &amp;&amp; (relation == c.relation())</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                    &amp;&amp; (t == c.t());</span>
+        }
+<span class="fc" id="L142">        return r;</span>
+    }
+
+
+
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L150">        return hash;</span>
+    }
+
+
+    @Override
+    public final int varDep() {
+<span class="fc" id="L156">        return terms.varDep();</span>
+    }
+
+    @Override
+    public final int varIndep() {
+<span class="fc" id="L161">        return terms.varIndep();</span>
+    }
+
+    @Override
+    public final int varQuery() {
+<span class="fc" id="L166">        return terms.varQuery();</span>
+    }
+
+    @Override
+    public final int vars() {
+<span class="fc" id="L171">        return terms.vars();</span>
+    }
+
+//    public final Term[] cloneTermsReplacing(int index, Term replaced) {
+//        return terms.cloneTermsReplacing(index, replaced);
+//    }
+
+    public final boolean isEmpty() {
+<span class="nc" id="L179">        return terms.isEmpty();</span>
+    }
+
+    public final boolean contains(Object o) {
+<span class="nc" id="L183">        return terms.contains(o);</span>
+    }
+
+
+    @Override
+    public final void forEach(@NotNull Consumer&lt;? super T&gt; action, int start, int stop) {
+<span class="nc" id="L189">        terms.forEach(action, start, stop);</span>
+<span class="nc" id="L190">    }</span>
+
+    @Override
+    public final void forEach(@NotNull Consumer&lt;? super T&gt; c) {
+<span class="nc" id="L194">        terms.forEach(c);</span>
+<span class="nc" id="L195">    }</span>
+
+    @Override public T[] terms() {
+<span class="fc" id="L198">        return terms.term;</span>
+    }
+
+    @Override
+    public final Term[] terms(@NotNull IntObjectPredicate&lt;T&gt; filter) {
+<span class="nc" id="L203">        return terms.terms(filter);</span>
+    }
+
+    @Override
+    public final Iterator&lt;T&gt; iterator() {
+<span class="fc" id="L208">        return terms.iterator();</span>
+    }
+
+    @Override
+    public int structure() {
+<span class="fc" id="L213">        return terms.structure() | op.bit();</span>
+    }
+
+    @Override
+    public final T term(int i) {
+<span class="fc" id="L218">        return terms.term(i);</span>
+    }
+
+    @Override
+    public final boolean containsTerm(@NotNull Term target) {
+<span class="fc" id="L223">        return terms.containsTerm(target);</span>
+    }
+
+    @Override
+    public final int size() {
+<span class="fc" id="L228">        return terms.size();</span>
+    }
+
+    @Override
+    public final int complexity() {
+<span class="fc" id="L233">        return terms.complexity();</span>
+    }
+
+    @Override
+    public final int volume() {
+<span class="fc" id="L238">        return terms.volume();</span>
+    }
+
+    @Override
+    public final boolean impossibleSubTermVolume(int otherTermVolume) {
+<span class="fc" id="L243">        return terms.impossibleSubTermVolume(otherTermVolume);</span>
+    }
+
+    @Override
+    public final boolean isNormalized() {
+<span class="fc" id="L248">        return normalized;</span>
+    }
+
+    @NotNull
+    @Override
+    public Compound t(int cycles) {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (cycles == t) return this;</span>
+<span class="fc" id="L255">        GenericCompound g = new GenericCompound(op(), relation, cycles, subterms());</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (normalized) g.setNormalized();</span>
+<span class="fc" id="L257">        return g;</span>
+    }
+
+    @Override
+    public int t() {
+<span class="fc" id="L262">        return t;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L267">        return toString(false);</span>
+    }
+
+    @Override
+    public int relation() {
+<span class="fc" id="L272">        return relation;</span>
+    }
+
+    /** do not call this manually, it will be set by VariableNormalization only */
+    public final void setNormalized() {
+<span class="fc" id="L277">        this.normalized = true;</span>
+<span class="fc" id="L278">    }</span>
+
+
+//    @Override
+//    public int bytesLength() {
+//        int len = /* opener byte */1 + (op.isImage() ? 1 : 0);
+//
+//        int n = size();
+//        for (int i = 0; i &lt; n; i++) {
+//            len += term(i).bytesLength() + 1 /* separator or closer if end*/;
+//        }
+//
+//        return len;
+//    }
+
+//    @Override
+//    public final byte[] bytes() {
+//
+//        ByteBuf b = ByteBuf.create(bytesLength());
+//
+//        b.add((byte) op().ordinal()); //header
+//
+//        if (op().isImage()) {
+//            b.add((byte) relation); //header
+//        }
+//
+//        appendSubtermBytes(b);
+//
+//        if (op().maxSize != 1) {
+//            b.add(COMPOUND_TERM_CLOSERbyte); //closer
+//        }
+//
+//        return b.toBytes();
+//    }
+//
+//
+//    @Override
+//    public void appendSubtermBytes(ByteBuf b) {
+//        terms.appendSubtermBytes(b);
+//    }
+//
+//    @Override
+//    public final boolean and(Predicate&lt;? super Term&gt; v) {
+//        return v.test(this) &amp;&amp; terms.and(v);
+//    }
+//    @Override
+//    public final boolean or(Predicate&lt;? super Term&gt; v) {
+//        return v.test(this) || terms.or(v);
+//    }
+
+
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Operator.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.nal.nal8</a> &gt; <span class="el_source">Operator.java</span></div><h1>Operator.java</h1><pre class="source lang-java linenums">package nars.nal.nal8;
+
+import nars.$;
+import nars.Op;
+import nars.task.MutableTask;
+import nars.task.Task;
+import nars.term.Term;
+import nars.term.atom.AbstractStringAtom;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * the 1-arity '^' compound which wraps a term to
+ * indicate an operator that can be used as the predicate
+ * of an Operation, ex:
+ *
+ *      &lt;(arg0, arg1) --&gt; ^operator&gt;
+ *
+ * This class also includes static utility methods for
+ * working with Operation terms (which include an &quot;Operator&quot;,
+ * as shown above, but is not an &quot;Operator&quot;).
+ *
+ */
+public final class Operator&lt;T extends Term&gt; extends AbstractStringAtom { //implements Term {
+
+
+    //final static byte[] opPrefix = new byte[] { (byte)'^' };
+
+    @NotNull
+    private final T term;
+
+    public Operator(@NotNull T the) {
+<span class="fc" id="L35">        super(Op.OPERATOR.ch + the.toString());</span>
+<span class="fc" id="L36">        term = the;</span>
+<span class="fc" id="L37">    }</span>
+
+    @NotNull
+    public static Compound opArgs(@NotNull Compound operation) {
+<span class="fc" id="L41">        return (Compound) operation.term(0);</span>
+    }
+
+    public static Term operatorName(@NotNull Compound operation) {
+<span class="fc" id="L45">        Operator tn = operatorTerm(operation);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (tn != null) return tn.identifier();</span>
+<span class="nc" id="L47">        return null;</span>
+    }
+
+    @NotNull
+    public static Operator operatorTerm(@NotNull Compound operation) {
+<span class="fc" id="L52">        return ((Operator) operation.term(1));</span>
+    }
+
+    /**
+     * creates a result term in the conventional format.
+     * the final term in the product (x) needs to be a variable,
+     * which will be replaced with the result term (y)
+     */
+    @Nullable
+    public static Term result(@NotNull Compound operation, Term y) {
+<span class="fc" id="L62">        Compound x = (Compound) operation.term(0);</span>
+        /*if (!(t instanceof Variable))
+            return null;*/
+
+<span class="fc" id="L66">        return $.inh(</span>
+                y, //SetExt.make(y),
+<span class="fc" id="L68">                makeImageExt(x, operation.term(1), (short) (x.size() - 1) /* position of the variable */)</span>
+        );
+    }
+
+    /**
+     * Try to make an Image from a Product and a relation. Called by the logic rules.
+     *
+     * @param product  The product
+     * @param relation The relation (the operator)
+     * @param index    The index of the place-holder (variable)
+     * @return A compound generated or a term it reduced to
+     */
+    @Nullable
+    private static Term makeImageExt(@NotNull Compound product, @NotNull Term relation, short index) {
+<span class="fc" id="L82">        int pl = product.size();</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (relation.op(Op.PRODUCT)) {</span>
+<span class="nc" id="L84">            Compound p2 = (Compound) relation;</span>
+<span class="nc bnc" id="L85" title="All 4 branches missed.">            if ((pl == 2) &amp;&amp; (p2.size() == 2)) {</span>
+<span class="nc bnc" id="L86" title="All 4 branches missed.">                if ((index == 0) &amp;&amp; product.term(1).equals(p2.term(1))) { // (/,_,(*,a,b),b) is reduced to a</span>
+<span class="nc" id="L87">                    return p2.term(0);</span>
+                }
+<span class="nc bnc" id="L89" title="All 4 branches missed.">                if ((index == 1) &amp;&amp; product.term(0).equals(p2.term(0))) { // (/,(*,a,b),a,_) is reduced to b</span>
+<span class="nc" id="L90">                    return p2.term(1);</span>
+                }
+            }
+        }
+        /*Term[] argument =
+            Terms.concat(new Term[] { relation }, product.cloneTerms()
+        );*/
+<span class="fc" id="L97">        Term[] argument = new Term[pl];</span>
+<span class="fc" id="L98">        argument[0] = relation;</span>
+<span class="fc" id="L99">        System.arraycopy(product.terms(), 0, argument, 1, pl - 1);</span>
+
+<span class="fc" id="L101">        return $.the(Op.IMAGE_EXT, index + 1, argument);</span>
+    }
+
+    /**
+     * applies certain data to a feedback task relating to its causing operation's task
+     */
+    public static Task feedback(@NotNull MutableTask feedback, @NotNull Task goal, float priMult, float durMult) {
+<span class="fc" id="L108">        return feedback.budget(goal.getBudget()).</span>
+<span class="fc" id="L109">                budgetScaled(priMult, durMult).</span>
+<span class="fc" id="L110">                parent(goal);</span>
+    }
+
+    public static Term[] opArgsArray(@NotNull Compound term) {
+<span class="fc" id="L114">        return opArgs(term).terms();</span>
+    }
+
+    @NotNull
+    @Override
+    public Op op() {
+<span class="fc" id="L120">        return Op.OPERATOR;</span>
+    }
+
+    @Override
+    public int complexity() {
+<span class="fc" id="L125">        return 1;</span>
+    }
+
+    @Override
+    public int varIndep() {
+<span class="fc" id="L130">        return 0;</span>
+    }
+
+    @Override
+    public int varDep() {
+<span class="fc" id="L135">        return 0;</span>
+    }
+
+    @Override
+    public int varQuery() {
+<span class="fc" id="L140">        return 0;</span>
+    }
+
+    @Override
+    public int vars() {
+<span class="nc" id="L145">        return 0;</span>
+    }
+
+
+    @NotNull
+    public static Operator the(String name) {
+<span class="fc" id="L151">        return the(Atom.the(name));</span>
+    }
+    @NotNull
+    public static Operator the(@NotNull Term x) {
+<span class="fc" id="L155">        return new Operator(x);</span>
+    }
+
+
+    @NotNull
+    public Term identifier() {
+<span class="fc" id="L161">        return term;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

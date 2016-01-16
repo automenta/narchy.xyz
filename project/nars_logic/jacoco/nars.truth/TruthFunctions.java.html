@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TruthFunctions.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.truth</a> &gt; <span class="el_source">TruthFunctions.java</span></div><h1>TruthFunctions.java</h1><pre class="source lang-java linenums">/*
+ * TruthFunctions.java
+ *
+ * Copyright (C) 2008  Pei Wang
+ *
+ * This file is part of Open-NARS.
+ *
+ * Open-NARS is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Open-NARS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the abduction warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Open-NARS.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
+ */
+package nars.truth;
+
+import nars.Global;
+import nars.nal.Tense;
+import nars.nal.UtilityFunctions;
+import org.jetbrains.annotations.NotNull;
+
+import static java.lang.Math.abs;
+
+/**
+ * All truth-value (and desire-value) functions used in logic rules
+ */
+<span class="nc" id="L33">public final class TruthFunctions extends UtilityFunctions {</span>
+
+    /* ----- Single argument functions, called in MatchingRules ----- */
+    /**
+     * {&lt;A ==&gt; B&gt;} |- &lt;B ==&gt; A&gt;
+     * @param t Truth value of the premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth conversion(@NotNull Truth t) {
+<span class="fc" id="L43">        float f1 = t.getFrequency();</span>
+<span class="fc" id="L44">        float c1 = t.getConfidence();</span>
+<span class="fc" id="L45">        float w = and(f1, c1);</span>
+<span class="fc" id="L46">        float c = w2c(w);</span>
+<span class="fc" id="L47">        return new DefaultTruth(1, c);</span>
+    }
+
+    /* ----- Single argument functions, called in StructuralRules ----- */
+    /**
+     * {A} |- (--A)
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth negation(@NotNull Truth v1) {
+<span class="fc" id="L57">        float f = 1.0f - v1.getFrequency();</span>
+<span class="fc" id="L58">        float c = v1.getConfidence();</span>
+<span class="fc" id="L59">        return new DefaultTruth(f, c);</span>
+
+        /*
+
+        if (t == null) return null;
+        final float f = 1 - t.getFrequency();
+        final float c = t.getConfidence();
+
+        if (t.isAnalytic())
+            return AnalyticTruth.get(f, c, t); //experimental: for cases where analytic is inverted, to preserve analytic state
+        else
+            return new DefaultTruth(f, c, t);
+            */
+    }
+
+
+    /**
+     * {&lt;A ==&gt; B&gt;} |- &lt;(--, B) ==&gt; (--, A)&gt;
+     * @param v1 Truth value of the premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth contraposition(@NotNull Truth v1) {
+<span class="fc" id="L82">        float f1 = v1.getFrequency();</span>
+<span class="fc" id="L83">        float c1 = v1.getConfidence();</span>
+<span class="fc" id="L84">        float w = and(1 - f1, c1);</span>
+<span class="fc" id="L85">        float c = w2c(w);</span>
+<span class="fc" id="L86">        return new DefaultTruth(0, c);</span>
+    }
+
+    /* ----- double argument functions, called in MatchingRules ----- */
+    /**
+     * {&lt;S ==&gt; P&gt;, &lt;S ==&gt; P&gt;} |- &lt;S ==&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth revision(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L98">        return revision(a, b, new DefaultTruth(0, 0));</span>
+    }
+
+    @NotNull
+    static Truth revision(@NotNull Truth a, @NotNull Truth b, @NotNull Truth result) {
+<span class="fc" id="L103">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L104">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L105">        float w1 = c2w(a.getConfidence());</span>
+<span class="fc" id="L106">        float w2 = c2w(b.getConfidence());</span>
+<span class="fc" id="L107">        float w = w1 + w2;</span>
+<span class="fc" id="L108">        return result.set(</span>
+                (w1 * f1 + w2 * f2) / w,
+<span class="fc" id="L110">                w2c(w)</span>
+        );
+    }
+
+
+
+    /**
+     * {M, &lt;M ==&gt; P&gt;} |- P
+     * @param a Truth value of the first premise
+     * @param reliance Confidence of the second (analytical) premise
+     * @return AnalyticTruth value of the conclusion, because it is structural
+     */
+    @NotNull
+    public static Truth deduction(@NotNull Truth a, float reliance) {
+<span class="fc" id="L124">        float f = a.getFrequency();</span>
+<span class="fc" id="L125">        float c = and(f, a.getConfidence(), reliance);</span>
+<span class="fc" id="L126">        return new DefaultTruth(f, c);</span>
+    }
+        /* ----- double argument functions, called in SyllogisticRules ----- */
+    /**
+     * {&lt;S ==&gt; M&gt;, &lt;M ==&gt; P&gt;} |- &lt;S ==&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return (non-Analytic) Truth value of the conclusion - normal truth because this is based on 2 premises
+     */
+    @NotNull
+    public static Truth deduction(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L137">        return deduction(a, b.getFrequency(), b.getConfidence());</span>
+    }
+
+    /** assumes belief freq=1f */
+    @NotNull
+    public static Truth deduction1(@NotNull Truth a, float bC) {
+<span class="fc" id="L143">        return deduction(a, 1f, bC);</span>
+    }
+
+    @NotNull
+    public static Truth deduction(@NotNull Truth a, float bF, float bC) {
+<span class="fc" id="L148">        float f = and(a.getFrequency(), bF);</span>
+<span class="fc" id="L149">        float c = and(f, a.getConfidence(), bC);</span>
+<span class="fc" id="L150">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * {&lt;S ==&gt; M&gt;, &lt;M &lt;=&gt; P&gt;} |- &lt;S ==&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth analogy(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L161">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L162">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L163">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L164">        float c2 = b.getConfidence();</span>
+<span class="fc" id="L165">        float f = and(f1, f2);</span>
+<span class="fc" id="L166">        float c = and(c1, c2, f2);</span>
+<span class="fc" id="L167">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * {&lt;S &lt;=&gt; M&gt;, &lt;M &lt;=&gt; P&gt;} |- &lt;S &lt;=&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth resemblance(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L178">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L179">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L180">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L181">        float c2 = b.getConfidence();</span>
+<span class="fc" id="L182">        float f = and(f1, f2);</span>
+<span class="fc" id="L183">        float c = and(c1, c2, or(f1, f2));</span>
+<span class="fc" id="L184">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * {&lt;S ==&gt; M&gt;, &lt;P ==&gt; M&gt;} |- &lt;S ==&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion, or null if either truth is analytic already
+     */
+    @NotNull
+    public static Truth abduction(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L195">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L196">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L197">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L198">        float c2 = b.getConfidence();</span>
+<span class="fc" id="L199">        float w = and(f2, c1, c2);</span>
+<span class="fc" id="L200">        float c = w2c(w);</span>
+<span class="fc" id="L201">        return new DefaultTruth(f1, c);</span>
+    }
+
+    /**
+     * {M, &lt;P ==&gt; M&gt;} |- P
+     * @param t Truth value of the first premise
+     * @param reliance Confidence of the second (analytical) premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth abduction(@NotNull Truth t, float reliance) {
+<span class="nc" id="L212">        float f1 = t.getFrequency();</span>
+<span class="nc" id="L213">        float c1 = t.getConfidence();</span>
+<span class="nc" id="L214">        float w = and(c1, reliance);</span>
+<span class="nc" id="L215">        float c = w2c(w);</span>
+<span class="nc" id="L216">        return new DefaultTruth(f1, c);</span>
+    }
+
+    /**
+     * {&lt;M ==&gt; S&gt;, &lt;M ==&gt; P&gt;} |- &lt;S ==&gt; P&gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth induction(@NotNull Truth v1, @NotNull Truth v2) {
+<span class="fc" id="L227">        return abduction(v2, v1);</span>
+    }
+
+    /**
+     * {&lt;M ==&gt; S&gt;, &lt;P ==&gt; M&gt;} |- &lt;S ==&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth exemplification(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L238">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L239">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L240">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L241">        float c2 = b.getConfidence();</span>
+<span class="fc" id="L242">        float w = and(f1, f2, c1, c2);</span>
+<span class="fc" id="L243">        float c = w2c(w);</span>
+<span class="fc" id="L244">        return new DefaultTruth(1, c);</span>
+    }
+
+    /**
+     * {&lt;M ==&gt; S&gt;, &lt;M ==&gt; P&gt;} |- &lt;S &lt;=&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth comparison(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L255">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L256">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L257">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L258">        float c2 = b.getConfidence();</span>
+<span class="fc" id="L259">        float f0 = or(f1, f2);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        float f = (f0 == 0) ? 0 : (and(f1, f2) / f0);</span>
+<span class="fc" id="L261">        float w = and(f0, c1, c2);</span>
+<span class="fc" id="L262">        float c = w2c(w);</span>
+<span class="fc" id="L263">        return new DefaultTruth(f, c);</span>
+    }
+
+    /* ----- desire-value functions, called in SyllogisticRules ----- */
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth desireStrong(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L275">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L276">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L277">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L278">        float c2 = b.getConfidence();</span>
+<span class="fc" id="L279">        float f = and(f1, f2);</span>
+<span class="fc" id="L280">        float c = and(c1, c2, f2);</span>
+<span class="fc" id="L281">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth desireWeak(@NotNull Truth v1, @NotNull Truth v2) {
+<span class="fc" id="L292">        float f1 = v1.getFrequency();</span>
+<span class="fc" id="L293">        float f2 = v2.getFrequency();</span>
+<span class="fc" id="L294">        float c1 = v1.getConfidence();</span>
+<span class="fc" id="L295">        float c2 = v2.getConfidence();</span>
+<span class="fc" id="L296">        float f = and(f1, f2);</span>
+<span class="fc" id="L297">        float c = and(c1, c2, f2, w2c(1.0f));</span>
+<span class="fc" id="L298">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth desireDed(@NotNull Truth v1, @NotNull Truth v2) {
+<span class="fc" id="L309">        float f1 = v1.getFrequency();</span>
+<span class="fc" id="L310">        float f2 = v2.getFrequency();</span>
+<span class="fc" id="L311">        float c1 = v1.getConfidence();</span>
+<span class="fc" id="L312">        float c2 = v2.getConfidence();</span>
+<span class="fc" id="L313">        float f = and(f1, f2);</span>
+<span class="fc" id="L314">        float c = and(c1, c2);</span>
+<span class="fc" id="L315">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * A function specially designed for desire value [To be refined]
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth desireInd(@NotNull Truth v1, @NotNull Truth v2) {
+<span class="fc" id="L326">        float f1 = v1.getFrequency();</span>
+<span class="fc" id="L327">        float f2 = v2.getFrequency();</span>
+<span class="fc" id="L328">        float c1 = v1.getConfidence();</span>
+<span class="fc" id="L329">        float c2 = v2.getConfidence();</span>
+<span class="fc" id="L330">        float w = and(f2, c1, c2);</span>
+<span class="fc" id="L331">        float c = w2c(w);</span>
+<span class="fc" id="L332">        return new DefaultTruth(f1, c);</span>
+    }
+
+    /* ----- double argument functions, called in CompositionalRules ----- */
+    /**
+     * {&lt;M --&gt; S&gt;, &lt;M &lt;-&gt; P&gt;} |- &lt;M --&gt; (S|P)&gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth union(@NotNull Truth v1, @NotNull Truth v2) {
+<span class="fc" id="L344">        float f1 = v1.getFrequency();</span>
+<span class="fc" id="L345">        float f2 = v2.getFrequency();</span>
+<span class="fc" id="L346">        float c1 = v1.getConfidence();</span>
+<span class="fc" id="L347">        float c2 = v2.getConfidence();</span>
+<span class="fc" id="L348">        float f = or(f1, f2);</span>
+<span class="fc" id="L349">        float c = and(c1, c2);</span>
+<span class="fc" id="L350">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * {&lt;M --&gt; S&gt;, &lt;M &lt;-&gt; P&gt;} |- &lt;M --&gt; (S&amp;P)&gt;
+     * @param v1 Truth value of the first premise
+     * @param v2 Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth intersection(@NotNull Truth v1, @NotNull Truth v2) {
+<span class="fc" id="L361">        float f1 = v1.getFrequency();</span>
+<span class="fc" id="L362">        float f2 = v2.getFrequency();</span>
+<span class="fc" id="L363">        float c1 = v1.getConfidence();</span>
+<span class="fc" id="L364">        float c2 = v2.getConfidence();</span>
+<span class="fc" id="L365">        float f = and(f1, f2);</span>
+<span class="fc" id="L366">        float c = and(c1, c2);</span>
+<span class="fc" id="L367">        return new DefaultTruth(f, c);</span>
+    }
+
+    /**
+     * {(||, A, B), (--, B)} |- A
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth reduceDisjunction(@NotNull Truth a, @NotNull Truth b) {
+<span class="nc" id="L378">        return deduction(intersection(a, negation(b)), 1.0f);</span>
+    }
+
+    /**
+     * {(--, (&amp;&amp;, A, B)), B} |- (--, A)
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth reduceConjunction(@NotNull Truth v1, @NotNull Truth v2) {
+<span class="fc" id="L387">        Truth v0 = intersection(negation(v1), v2);</span>
+<span class="fc" id="L388">        return negation(deduction(v0, 1.0f));</span>
+
+//        AnalyticTruth x = deduction(
+//                intersection(negation(a), b),
+//                1f
+//        );
+//        if (x!=null)
+//            return x.negate();
+//        else
+//            return null;
+    }
+
+    /**
+     * {(--, (&amp;&amp;, A, (--, B))), (--, B)} |- (--, A)
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth reduceConjunctionNeg(@NotNull Truth a, @NotNull Truth b) {
+<span class="nc" id="L408">        return reduceConjunction(a, negation(b));</span>
+    }
+
+    /**
+     * {(&amp;&amp;, &lt;#x() ==&gt; M&gt;, &lt;#x() ==&gt; P&gt;), S ==&gt; M} |- &lt;S ==&gt; P&gt;
+     * @param a Truth value of the first premise
+     * @param b Truth value of the second premise
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static Truth anonymousAnalogy(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L419">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L420">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L421">        Truth v0 = new DefaultTruth(f1, w2c(c1));</span>
+<span class="fc" id="L422">        return analogy(b, v0);</span>
+    }
+
+    @NotNull
+    public static Truth decomposePositiveNegativeNegative(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L427">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L428">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L429">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L430">        float c2 = b.getConfidence();</span>
+
+<span class="fc" id="L432">        float fn = and(f1,1-f2);</span>
+<span class="fc" id="L433">        return new DefaultTruth(1-fn, and(fn,c1,c2));</span>
+    }
+
+    @NotNull
+    public static Truth decomposeNegativePositivePositive(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L438">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L439">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L440">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L441">        float c2 = b.getConfidence();</span>
+
+<span class="fc" id="L443">        float f = and((1-f1),f2);</span>
+<span class="fc" id="L444">        return new DefaultTruth(f, and(f,c1,c2));</span>
+    }
+
+    @NotNull
+    public static Truth decomposePositiveNegativePositive(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L449">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L450">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L451">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L452">        float c2 = b.getConfidence();</span>
+
+<span class="fc" id="L454">        float f = and(f1,(1-f2));</span>
+<span class="fc" id="L455">        return new DefaultTruth(f, and(f,c1,c2));</span>
+    }
+
+    @NotNull
+    public static Truth decomposeNegativeNegativeNegative(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L460">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L461">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L462">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L463">        float c2 = b.getConfidence();</span>
+
+<span class="fc" id="L465">        float fn = and((1-f1),(1-f2));</span>
+<span class="fc" id="L466">        return new DefaultTruth(1-fn, and(fn,c1,c2));</span>
+    }
+
+    @NotNull
+    public static Truth difference(@NotNull Truth a, @NotNull Truth b) {
+<span class="fc" id="L471">        float f1 = a.getFrequency();</span>
+<span class="fc" id="L472">        float c1 = a.getConfidence();</span>
+<span class="fc" id="L473">        float f2 = b.getFrequency();</span>
+<span class="fc" id="L474">        float c2 = b.getConfidence();</span>
+
+<span class="fc" id="L476">        return new DefaultTruth(and(f1,(1-f2)), and(c1,c2));</span>
+    }
+
+    @NotNull
+    public static ProjectedTruth eternalize(@NotNull Truth t) {
+<span class="fc" id="L481">        return eternalize(t.getFrequency(), t.getConfidence());</span>
+    }
+
+    /**
+     * From one moment to eternal
+     * @return Truth value of the conclusion
+     */
+    @NotNull
+    public static ProjectedTruth eternalize(float freq, float conf) {
+<span class="fc" id="L490">        return new ProjectedTruth(</span>
+                freq,
+<span class="fc" id="L492">                eternalizedConfidence(conf), Tense.ETERNAL</span>
+        );
+    }
+    public static float eternalizedConfidence(float conf) {
+<span class="fc" id="L496">        return w2c(conf);</span>
+    }
+    
+    public static float temporalProjection(long sourceTime, long targetTime, long currentTime) {
+<span class="fc" id="L500">        long den = (abs(sourceTime - currentTime) + abs(targetTime - currentTime));</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if (den == 0) return 1f;</span>
+<span class="fc" id="L502">        return abs(sourceTime - targetTime) / (float)den;</span>
+    }
+
+    /**
+     * A function to convert confidence to weight
+     * @param c confidence, in [0, 1)
+     * @return The corresponding weight of evidence, a non-negative real number
+     */
+    public static float c2w(float c) {
+<span class="fc" id="L511">        return Global.HORIZON * c / (1 - c);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

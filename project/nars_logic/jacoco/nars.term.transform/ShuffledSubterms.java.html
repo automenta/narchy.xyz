@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ShuffledSubterms.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term.transform</a> &gt; <span class="el_source">ShuffledSubterms.java</span></div><h1>ShuffledSubterms.java</h1><pre class="source lang-java linenums">package nars.term.transform;
+
+import nars.term.Term;
+import nars.term.TermContainer;
+import nars.util.math.ShuffledPermutations;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Random;
+import java.util.function.Consumer;
+
+/**
+ * proxy to a TermContainer providing access to its subterms via a shuffling order
+ */
+public final class ShuffledSubterms extends ShuffledPermutations implements TermContainer&lt;Term&gt; {
+
+    public final TermContainer compound;
+    private final Random rng;
+
+<span class="fc" id="L21">    public ShuffledSubterms(Random rng, TermContainer x) {</span>
+<span class="fc" id="L22">        this.rng = rng;</span>
+<span class="fc" id="L23">        this.compound = x;</span>
+<span class="fc" id="L24">        reset();</span>
+<span class="fc" id="L25">    }</span>
+
+    @Override
+    public int structure() {
+<span class="nc" id="L29">        return compound.structure();</span>
+    }
+
+    @Override
+    public int volume() {
+<span class="nc" id="L34">        return compound.volume();</span>
+    }
+
+    @Override
+    public int complexity() {
+<span class="nc" id="L39">        return compound.complexity();</span>
+    }
+
+    @Override
+    public int size() {
+<span class="fc" id="L44">        return compound.size();</span>
+    }
+
+    @Override
+    public Term term(int i) {
+<span class="fc" id="L49">        return compound.term(get(i));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L54">        return TermContainer.toString(this);</span>
+    }
+
+    @Override
+    public boolean impossibleSubTermVolume(int otherTermVolume) {
+<span class="nc" id="L59">        return compound.impossibleSubTermVolume(otherTermVolume);</span>
+    }
+
+    @Override
+    public boolean hasEllipsis() {
+<span class="nc" id="L64">        return compound.hasEllipsis();</span>
+    }
+
+    @Override
+    public boolean containsTerm(Term term) {
+<span class="nc" id="L69">        return compound.containsTerm(term);</span>
+    }
+
+    @Override
+    public void forEach(Consumer action, int start, int stop) {
+<span class="nc" id="L74">        compound.forEach(action, start, stop);</span>
+<span class="nc" id="L75">    }</span>
+
+    @Override
+    public int varDep() {
+<span class="nc" id="L79">        return compound.varDep();</span>
+    }
+
+    @Override
+    public int varIndep() {
+<span class="nc" id="L84">        return compound.varIndep();</span>
+    }
+
+    @Override
+    public int varQuery() {
+<span class="nc" id="L89">        return compound.varQuery();</span>
+    }
+
+    @Override
+    public int vars() {
+<span class="nc" id="L94">        return compound.vars();</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc" id="L99">        return compound.equals(obj);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L104">        return compound.hashCode();</span>
+    }
+
+    @Override
+    public int compareTo(@NotNull Object o) {
+<span class="nc" id="L109">        return compound.compareTo(o);</span>
+    }
+
+    @Override
+    public Iterator iterator() {
+<span class="nc" id="L114">        return compound.iterator();</span>
+    }
+
+
+    @NotNull
+    @Override
+    public Term[] terms() {
+<span class="nc" id="L121">        int s = size();</span>
+<span class="nc" id="L122">        Term[] x = new Term[s];</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        for (int i = 0; i &lt; s; i++)</span>
+<span class="nc" id="L124">            x[i] = term(i);</span>
+<span class="nc" id="L125">        return x;</span>
+    }
+
+
+    @Override
+    public void addAllTo(@NotNull Collection&lt;Term&gt; set) {
+<span class="nc" id="L131">        forEach(set::add);</span>
+<span class="nc" id="L132">    }</span>
+
+    public void reset() {
+<span class="fc" id="L135">        restart(compound.size(), rng);</span>
+<span class="fc" id="L136">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

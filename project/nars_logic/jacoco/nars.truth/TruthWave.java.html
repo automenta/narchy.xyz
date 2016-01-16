@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TruthWave.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.truth</a> &gt; <span class="el_source">TruthWave.java</span></div><h1>TruthWave.java</h1><pre class="source lang-java linenums">package nars.truth;
+
+import nars.nal.Tense;
+import nars.task.Task;
+import nars.util.Texts;
+import org.jetbrains.annotations.NotNull;
+
+/** chart-like representation of a belief state at each time cycle in a range of time */
+public class TruthWave {
+
+    //start and stop interval (in cycles)
+    final long start;
+    final long end;
+
+    //expect[1][] is the mean positive expectation, expect[0][] is the mean negative expectation
+    float[][] expect;
+
+    //TODO total confidence
+
+    //mean positive and negative eternal expectations
+    float expectEternal0, expectEternal1;
+    int numEternal, numTemporal;
+
+<span class="nc" id="L24">    public TruthWave(@NotNull Iterable&lt;Task&gt; beliefs) {</span>
+
+<span class="nc" id="L26">        long min = Long.MAX_VALUE;</span>
+<span class="nc" id="L27">        long max = Long.MIN_VALUE;</span>
+
+        //get min and max occurence time
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        for (Task t : beliefs) {</span>
+<span class="nc" id="L31">            long o = t.getOccurrenceTime();</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">            if (o == Tense.ETERNAL) {</span>
+<span class="nc" id="L33">                expectEternal1 += t.getTruth().getExpectationPositive();</span>
+<span class="nc" id="L34">                expectEternal0 += t.getTruth().getExpectationNegative();</span>
+<span class="nc" id="L35">                numEternal++;</span>
+            }
+            else {
+<span class="nc" id="L38">                numTemporal++;</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">                if (o &gt; max) max = o;</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">                if (o &lt; min) min = o;</span>
+            }
+<span class="nc" id="L42">        }</span>
+
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (numEternal &gt; 0) {</span>
+<span class="nc" id="L45">            expectEternal1 /= numEternal;</span>
+<span class="nc" id="L46">            expectEternal0 /= numEternal;</span>
+        }
+
+<span class="nc" id="L49">        start = min;</span>
+<span class="nc" id="L50">        end = max;</span>
+
+<span class="nc" id="L52">        int range = length();</span>
+<span class="nc" id="L53">        expect = new float[2][];</span>
+<span class="nc" id="L54">        expect[0] = new float[range+1];</span>
+<span class="nc" id="L55">        expect[1] = new float[range+1];</span>
+
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (numTemporal &gt; 0) {</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            for (Task t : beliefs) {</span>
+<span class="nc" id="L59">                long o = t.getOccurrenceTime();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">                if (o != Tense.ETERNAL) {</span>
+<span class="nc" id="L61">                    int i = (int)(o - min);</span>
+<span class="nc" id="L62">                    expect[1][i] += t.getTruth().getExpectationPositive();</span>
+<span class="nc" id="L63">                    expect[0][i] += t.getTruth().getExpectationNegative();</span>
+                }
+<span class="nc" id="L65">            }</span>
+
+            //normalize
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            for (int i = 0; i &lt; (max-min); i++) {</span>
+<span class="nc" id="L69">                expect[0][i] /= numTemporal;</span>
+<span class="nc" id="L70">                expect[1][i] /= numTemporal;</span>
+            }
+        }
+
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * 2 decimal representation of values between 0 and 1. only the tens and hundredth
+     * decimal point are displayed - not the ones, and not a decimal point.
+     * for compact display.
+     * if the value=1.0, then 'aa' is the result
+     */
+    @NotNull
+    public static String n2u(float x) {
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        if ((x &lt; 0) || (x &gt; 1)) throw new RuntimeException(&quot;values &gt;=0 and &lt;=1&quot;);</span>
+<span class="nc" id="L85">        int hundreds = (int) Texts.hundredths(x);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (x == 100) return &quot;aa&quot;;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        return hundreds &lt; 10 ? &quot;0&quot; + hundreds : Integer.toString(hundreds);</span>
+    }
+
+    //TODO getFrequencyAnalysis
+    //TODO getDistribution
+
+<span class="nc" id="L93">    public int length() { return (int)(end-start); }</span>
+
+    public void print() {
+<span class="nc" id="L96">        System.out.print(&quot;eternal=&quot; + numEternal + &quot;, temporal=&quot; + numTemporal);</span>
+
+
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (length() == 0) {</span>
+<span class="nc" id="L100">            System.out.println();</span>
+<span class="nc" id="L101">            return;</span>
+        }
+<span class="nc" id="L103">        System.out.println(&quot; @ &quot; + start + &quot;..&quot; + end);</span>
+
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        for (int c = 0; c &lt; 2; c++) {</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            for (int i = 0; i &lt; length(); i++) {</span>
+
+<span class="nc" id="L108">                float v = expect[c][i];</span>
+
+<span class="nc" id="L110">                System.out.print(n2u(v) + ' ');</span>
+
+            }
+<span class="nc" id="L113">            System.out.println();</span>
+        }
+<span class="nc" id="L115">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

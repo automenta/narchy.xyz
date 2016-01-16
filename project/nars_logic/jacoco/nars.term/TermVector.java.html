@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>TermVector.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.term</a> &gt; <span class="el_source">TermVector.java</span></div><h1>TermVector.java</h1><pre class="source lang-java linenums">package nars.term;
+
+import com.google.common.base.Joiner;
+import com.gs.collections.api.block.function.Function;
+import com.gs.collections.api.block.predicate.primitive.IntObjectPredicate;
+import nars.term.compound.Compound;
+import nars.term.match.Ellipsis;
+import nars.term.visit.SubtermVisitor;
+import nars.util.data.Util;
+import org.apache.commons.lang3.ArrayUtils;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.function.Consumer;
+
+/**
+ * Holds a vector or tuple of terms.
+ * Useful for storing a fixed number of subterms
+ *
+ * TODO make this class immutable and term field private
+ * provide a MutableTermVector that holds any write/change methods
+ */
+public class TermVector&lt;T extends Term&gt; implements TermContainer&lt;T&gt;, Serializable {
+
+<span class="fc" id="L30">    public final static TermVector Empty = new TermVector();</span>
+
+    /**
+     * list of (direct) term
+     * TODO make not public
+     */
+    public final T[] term;
+
+
+
+    /**
+     * bitvector of subterm types, indexed by NALOperator's .ordinal() and OR'd into by each subterm
+     */
+    protected transient int structureHash;
+    protected transient int contentHash;
+    protected transient short volume;
+    protected transient short complexity;
+
+    /**
+     * # variables contained, of each type &amp; total
+     */
+    protected transient byte varTotal;
+    protected transient byte hasVarQueries;
+    protected transient byte hasVarIndeps;
+    protected transient byte hasVarDeps;
+
+    //    public TermVector() {
+//        this(null);
+//    }
+
+    public TermVector(@NotNull Collection&lt;T&gt; t, Class c) {
+<span class="fc" id="L61">        this((T[]) t.toArray((T[]) Array.newInstance(c, t.size())));</span>
+<span class="fc" id="L62">    }</span>
+
+    public TermVector(@NotNull Collection&lt;T&gt; t) {
+<span class="fc" id="L65">        this((T[]) t.toArray(new Term[t.size()]));</span>
+<span class="fc" id="L66">    }</span>
+
+    /** first n items */
+    public TermVector(@NotNull Collection&lt;T&gt; t, int n) {
+<span class="nc" id="L70">        this((T[]) t.toArray(new Term[n]));</span>
+<span class="nc" id="L71">    }</span>
+
+    @SafeVarargs
+<span class="fc" id="L74">    public TermVector(T... t) {</span>
+<span class="fc" id="L75">        term = t;</span>
+<span class="fc" id="L76">        init();</span>
+<span class="fc" id="L77">    }</span>
+
+<span class="nc" id="L79">    public TermVector(@NotNull T[] source, @NotNull Function&lt;T,Termed&lt;T&gt;&gt; mapping) {</span>
+<span class="nc" id="L80">        int len = source.length;</span>
+<span class="nc" id="L81">        Term[] t = this.term = (T[]) new Term[len];</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++)</span>
+<span class="nc" id="L83">            t[i] = mapping.valueOf(source[i]).term();</span>
+<span class="nc" id="L84">        init();</span>
+<span class="nc" id="L85">    }</span>
+
+
+    @Override public T[] terms() {
+<span class="fc" id="L89">        return term;</span>
+    }
+
+
+
+    @NotNull
+    @Override public final Term[] terms(@NotNull IntObjectPredicate&lt;T&gt; filter) {
+<span class="nc" id="L96">        return Terms.filter(term, filter);</span>
+    }
+
+
+    @Override
+    public final int structure() {
+<span class="fc" id="L102">        return structureHash;</span>
+    }
+
+    @Override
+    public final T term(int i) {
+<span class="fc" id="L107">        return term[i];</span>
+    }
+
+    public boolean equals(Term[] t) {
+<span class="nc" id="L111">        return Arrays.equals(term, t);</span>
+    }
+
+
+
+    @Override
+    public final int volume() {
+<span class="fc" id="L118">        return volume;</span>
+    }
+
+    /**
+     * report the term's syntactic complexity
+     *
+     * @return the complexity value
+     */
+    @Override
+    public final int complexity() {
+<span class="fc" id="L128">        return complexity;</span>
+    }
+
+    /**
+     * get the number of term
+     *
+     * @return the size of the component list
+     */
+    @Override
+    public final int size() {
+<span class="fc" id="L138">        return term.length;</span>
+    }
+
+//
+//    @Override
+//    public void setNormalized(boolean b) {
+//        normalized = true;
+//    }
+
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="fc" id="L151">        return '(' + Joiner.on(',').join(term) + ')';</span>
+    }
+
+    @Override
+    public final int varDep() {
+<span class="fc" id="L156">        return hasVarDeps;</span>
+    }
+
+    @Override
+    public final int varIndep() {
+<span class="fc" id="L161">        return hasVarIndeps;</span>
+    }
+
+    @Override
+    public final int varQuery() {
+<span class="fc" id="L166">        return hasVarQueries;</span>
+    }
+
+    @Override
+    public final int vars() {
+<span class="fc" id="L171">        return varTotal;</span>
+    }
+
+//    public Term[] cloneTermsReplacing(int index, Term replaced) {
+//        Term[] y = termsCopy();
+//        y[index] = replaced;
+//        return y;
+//    }
+
+    public final boolean isEmpty() {
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        return size() != 0;</span>
+    }
+
+    @Override
+    public final boolean hasEllipsis() {
+<span class="fc" id="L186">        return Ellipsis.hasEllipsis(this);</span>
+    }
+
+    /**
+     * first level only, not recursive
+     */
+    public final boolean contains(Object o) {
+<span class="nc bnc" id="L193" title="All 4 branches missed.">        return o instanceof Term &amp;&amp; containsTerm((Term) o);</span>
+    }
+
+    @Override
+    public final Iterator&lt;T&gt; iterator() {
+<span class="fc" id="L198">        return Arrays.stream(term).iterator();</span>
+    }
+
+
+    @Override
+    public final void forEach(@NotNull Consumer&lt;? super T&gt; action, int start, int stop) {
+<span class="nc" id="L204">        T[] tt = term;</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        for (int i = start; i &lt; stop; i++)</span>
+<span class="nc" id="L206">            action.accept(tt[i]);</span>
+<span class="nc" id="L207">    }</span>
+
+    @Override
+    public final void forEach(@NotNull Consumer&lt;? super T&gt; action) {
+<span class="fc" id="L211">        T[] tt = term;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (T t : tt)</span>
+<span class="fc" id="L213">            action.accept(t);</span>
+<span class="fc" id="L214">    }</span>
+
+    /**
+     * Check the subterms (first level only) for a target term
+     *
+     * @param t The term to be searched
+     * @return Whether the target is in the current term
+     */
+    @Override
+    public final boolean containsTerm(@NotNull Term t) {
+<span class="fc bfc" id="L224" title="All 4 branches covered.">        return !impossibleSubterm(t) &amp;&amp; Terms.contains(term, t);</span>
+    }
+
+
+//    static int nextContentHash(int hash, int subtermHash) {
+//        return Util.PRIME2 * hash + subtermHash;
+//        //return (hash &lt;&lt; 4) +  subtermHash;
+//        //(Util.PRIME2 * contentHash)
+//    }
+
+
+    /** returns hashcode */
+    public final int init() {
+
+<span class="fc" id="L238">        int deps = 0, indeps = 0, queries = 0;</span>
+<span class="fc" id="L239">        int compl = 1, vol = 1;</span>
+
+<span class="fc" id="L241">        int subt = 0;</span>
+<span class="fc" id="L242">        int contentHash = 1;</span>
+
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (Term t : term) {</span>
+
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            if (t == this)</span>
+<span class="nc" id="L247">                throw new RecursiveTermContentException(t);</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (t == null)</span>
+<span class="nc" id="L249">                throw new NullPointerException();</span>
+
+<span class="fc" id="L251">            contentHash = Util.hashCombine(contentHash, t.hashCode());</span>
+
+<span class="fc" id="L253">            compl += t.complexity();</span>
+<span class="fc" id="L254">            vol += t.volume();</span>
+<span class="fc" id="L255">            deps += t.varDep();</span>
+<span class="fc" id="L256">            indeps += t.varIndep();</span>
+<span class="fc" id="L257">            queries += t.varQuery();</span>
+<span class="fc" id="L258">            subt |= t.structure();</span>
+        }
+
+        //MAX 255 variables
+<span class="fc" id="L262">        hasVarDeps = (byte) deps;</span>
+<span class="fc" id="L263">        hasVarIndeps = (byte) indeps;</span>
+<span class="fc" id="L264">        hasVarQueries = (byte) queries;</span>
+<span class="fc" id="L265">        structureHash = subt;</span>
+<span class="fc" id="L266">        varTotal = (byte) (deps + indeps + queries);</span>
+
+<span class="fc" id="L268">        complexity = (short) compl;</span>
+<span class="fc" id="L269">        volume = (short) vol;</span>
+
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (contentHash == 0) contentHash = 1; //nonzero to indicate hash calculated</span>
+<span class="fc" id="L272">        this.contentHash = contentHash;</span>
+<span class="fc" id="L273">        return contentHash;</span>
+    }
+
+    @Override
+    public final void addAllTo(@NotNull Collection&lt;Term&gt; set) {
+<span class="fc" id="L278">        Collections.addAll(set, term);</span>
+<span class="fc" id="L279">    }</span>
+
+    @Override
+    public final int hashCode() {
+<span class="fc" id="L283">        return contentHash;</span>
+//        final int h = contentHash;
+//        if (h == 0) {
+//            //if hash is zero, it means it needs calculated
+//            //return init(term);
+//            throw new RuntimeException(&quot;unhashed&quot;);
+//        }
+//        return h;
+    }
+
+    @Override
+    public boolean equals(Object that) {
+
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (this == that) return true;</span>
+
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (!(that instanceof TermVector)) return false;</span>
+
+<span class="fc" id="L300">        TermVector c = (TermVector) that;</span>
+<span class="pc bpc" id="L301" title="2 of 6 branches missed.">        return (contentHash == c.contentHash) &amp;&amp;</span>
+                (structureHash == c.structureHash) &amp;&amp;
+                (volume == c.volume) &amp;&amp;
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                equalTerms(c);</span>
+    }
+
+    private boolean equalTerms(@NotNull TermContainer c) {
+<span class="fc" id="L308">        int s = size();</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (s!=c.size())</span>
+<span class="nc" id="L310">            return false;</span>
+
+<span class="fc" id="L312">        T[] tt = this.term;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        for (int i = 0; i &lt; s; i++) {</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (!tt[i].equals(c.term(i)))</span>
+<span class="fc" id="L315">                return false;</span>
+        }
+
+<span class="fc" id="L318">        return true;</span>
+    }
+
+
+    @Override
+    public final int compareTo(@NotNull Object o) {
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (this == o) return 0;</span>
+
+        int diff;
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if ((diff = Integer.compare(hashCode(), o.hashCode())) != 0)</span>
+<span class="fc" id="L328">            return diff;</span>
+
+        //TODO dont assume it's a TermVector
+<span class="fc" id="L331">        TermVector c = (TermVector) o;</span>
+        int diff2;
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if ((diff2 = Integer.compare(structure(), c.structure())) != 0)</span>
+<span class="nc" id="L334">            return diff2;</span>
+
+<span class="fc" id="L336">        return compareContent(c);</span>
+    }
+
+    public int compareContent(@NotNull TermVector c) {
+
+<span class="fc" id="L341">        int s = size(), diff;</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if ((diff = Integer.compare(s, c.size())) != 0)</span>
+<span class="nc" id="L343">            return diff;</span>
+
+<span class="fc" id="L345">        T[] thisTerms = this.term;</span>
+<span class="fc" id="L346">        final Term[] thatTerms = c.term;</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        for (int i = 0; i &lt; s; i++) {</span>
+<span class="fc" id="L348">            int d = thisTerms[i].compareTo(thatTerms[i]);</span>
+
+        /*
+        if (Global.DEBUG) {
+            int d2 = b.compareTo(a);
+            if (d2!=-d)
+                throw new RuntimeException(&quot;ordering inconsistency: &quot; + a + &quot;, &quot; + b );
+        }
+        */
+
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (d != 0) return d;</span>
+        }
+
+<span class="fc" id="L361">        return 0;</span>
+    }
+
+    public final void visit(@NotNull SubtermVisitor v, Compound parent) {
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        for (Term t : term)</span>
+<span class="nc" id="L366">            v.accept(t, parent);</span>
+<span class="nc" id="L367">    }</span>
+
+    @NotNull
+    public TermVector reverse() {
+<span class="nc" id="L371">        Term[] r = terms().clone();</span>
+<span class="nc" id="L372">        ArrayUtils.reverse(r);</span>
+<span class="nc" id="L373">        return new TermVector(r);</span>
+    }
+
+
+    /** thrown if a compound term contains itself as an immediate subterm */
+    public static final class RecursiveTermContentException extends RuntimeException {
+
+        @NotNull
+        public final Term term;
+
+        public RecursiveTermContentException(@NotNull Term t) {
+<span class="nc" id="L384">            super(t.toString());</span>
+<span class="nc" id="L385">            this.term = t;</span>
+<span class="nc" id="L386">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>LogicMeter.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.meter</a> &gt; <span class="el_source">LogicMeter.java</span></div><h1>LogicMeter.java</h1><pre class="source lang-java linenums">package nars.util.meter;
+
+import nars.Memory;
+import nars.budget.BudgetedHandle;
+import nars.concept.Concept;
+import nars.util.event.FrameReaction;
+import nars.util.meter.event.DoubleMeter;
+import nars.util.meter.event.HitMeter;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Consumer;
+
+/**
+ * Logic/reasoning sensors
+ * &lt;p&gt;
+ * TODO make a distinction between ValueMeter and IncrementingValueMeter for
+ * accumulating multiple cycless data into one frame's aggregate
+ * &lt;p&gt;
+ * TODO add the remaining meter types for NARS data structures (ex: Concept metrics)
+ */
+public class LogicMeter extends FrameReaction {
+
+
+
+    @NotNull
+    public final Memory m;
+
+    //public final HitMeter TASK_PROCESS = new HitMeter(&quot;task.immediate_process&quot;);
+
+    //public final HitMeter TASKLINK_FIRE = new HitMeter(&quot;tasklink.fire&quot;);
+
+<span class="fc" id="L33">    public final DoubleMeter CONCEPTS_ACTIVE = new DoubleMeter(&quot;concepts.active&quot;);</span>
+<span class="fc" id="L34">    public final DoubleMeter CONCEPTS_TOTAL = new DoubleMeter(&quot;concepts.total&quot;);</span>
+//    public final DoubleMeter TERMLINK_MASS_CONCEPT_MEAN = new DoubleMeter(&quot;termlink.mass.concept_mean&quot;);
+//    public final DoubleMeter TERMLINK_MASS_MEAN = new DoubleMeter(&quot;termlink.mass.mean&quot;);
+//    public final DoubleMeter TASKLINK_MASS_CONCEPT_MEAN = new DoubleMeter(&quot;tasklink.mass.concept_mean&quot;);
+//    public final DoubleMeter TASKLINK_MASS_MEAN = new DoubleMeter(&quot;tasklink.mass.mean&quot;);
+
+
+<span class="fc" id="L41">    public final DoubleMeter CONCEPT_BELIEF_COUNT = new DoubleMeter(&quot;concept.belief.count&quot;);</span>
+<span class="fc" id="L42">    public final DoubleMeter CONCEPT_QUESTION_COUNT = new DoubleMeter(&quot;concept.question.count&quot;);</span>
+<span class="fc" id="L43">    public final HitMeter TERM_LINK_TRANSFORM = new HitMeter(&quot;concept.termlink.transform&quot;);</span>
+
+    //SummaryStatistics inputPriority = new SummaryStatistics();
+    //public final DoubleMeter INPUT_PRIORITY_SUM = new DoubleMeter(&quot;input.pri.sum&quot;);
+
+    /**
+     * triggered for each StructuralRules.contraposition().
+     * counts invocation and records complexity of statement parameter
+     */
+<span class="fc" id="L52">    public final HitMeter CONTRAPOSITION = new HitMeter(&quot;rule.contraposition&quot;);</span>
+
+
+<span class="fc" id="L55">    public final HitMeter TASK_ADD_NEW = new HitMeter(&quot;task.new.add&quot;);</span>
+    //public final HitMeter TASK_DERIVED = new HitMeter(&quot;task.derived&quot;);
+<span class="fc" id="L57">    public final HitMeter TASK_EXECUTED = new HitMeter(&quot;task.executed&quot;);</span>
+<span class="fc" id="L58">    public final HitMeter TASK_ADD_NOVEL = new HitMeter(&quot;task.novel.add&quot;);</span>
+
+<span class="fc" id="L60">    public final HitMeter CONCEPT_NEW = new HitMeter(&quot;concept.new&quot;);</span>
+
+    /** when a concept is remembered (different than created) */
+<span class="fc" id="L63">    public final HitMeter CONCEPT_REMEMBER = new HitMeter(&quot;concept.remember&quot;);</span>
+    //@Deprecated public final HitMeter CONCEPT_FORGET = new HitMeter(&quot;concept.forget&quot;);
+
+<span class="fc" id="L66">    public final HitMeter JUDGMENT_PROCESS = new HitMeter(&quot;judgment.process&quot;);</span>
+<span class="fc" id="L67">    public final HitMeter GOAL_PROCESS = new HitMeter(&quot;goal.process&quot;);</span>
+<span class="fc" id="L68">    public final HitMeter QUESTION_PROCESS = new HitMeter(&quot;question.process&quot;);</span>
+
+
+    //public final HitMeter BELIEF_REVISION = new HitMeter(&quot;rule.belief.revised&quot;);
+<span class="fc" id="L72">    public final HitMeter DED_SECOND_LAYER_VARIABLE_UNIFICATION_TERMS = new HitMeter(&quot;rule.ded2ndunifterms&quot;);</span>
+<span class="fc" id="L73">    public final HitMeter DED_SECOND_LAYER_VARIABLE_UNIFICATION = new HitMeter(&quot;rule.ded2ndunif&quot;);</span>
+<span class="fc" id="L74">    public final HitMeter DED_CONJUNCTION_BY_QUESTION = new HitMeter(&quot;rule.dedconjbyquestion&quot;);</span>
+<span class="fc" id="L75">    public final HitMeter ANALOGY = new HitMeter(&quot;rule.analogy&quot;);</span>
+
+
+    //public final DoubleMeter DERIVATION_LATENCY = new DoubleMeter(&quot;rule.derivation.latency&quot;);
+<span class="fc" id="L79">    public final DoubleMeter SOLUTION_BEST = new DoubleMeter(&quot;task.solution.best&quot;);</span>
+
+
+    /*
+    public final DoubleMeter PLAN_GRAPH_IN_DELAY_MAGNITUDE = new DoubleMeter(&quot;plan.graph.add#delay_magnitude&quot;);
+    public final DoubleMeter PLAN_GRAPH_IN_OPERATION = new DoubleMeter(&quot;plan.graph.add#operation&quot;);
+    public final DoubleMeter PLAN_GRAPH_IN_OTHER = new DoubleMeter(&quot;plan.graph.add#other&quot;);
+    public final DoubleMeter PLAN_GRAPH_EDGE = new DoubleMeter(&quot;plan.graph.edge&quot;);
+    public final DoubleMeter PLAN_GRAPH_VERTEX = new DoubleMeter(&quot;plan.graph.vertex&quot;);
+    public final DoubleMeter PLAN_TASK_PLANNED = new DoubleMeter(&quot;plan.task.planned&quot;);
+    public final DoubleMeter PLAN_TASK_EXECUTABLE = new DoubleMeter(&quot;plan.task.executable&quot;);
+    */
+
+    //public final ValueMeter TASK_INPUT = new ValueMeter(&quot;task.input&quot;);
+
+    //private double conceptVariance;
+    //private double[] conceptHistogram;
+
+
+    public LogicMeter(@NotNull Memory m) {
+<span class="fc" id="L99">        super(m);</span>
+<span class="fc" id="L100">        this.m = m;</span>
+<span class="fc" id="L101">    }</span>
+
+    @Override
+    public void onFrame() {
+<span class="fc" id="L105">        conceptMeter.reset();</span>
+        //m.getConcepts().forEach(conceptMeter);
+<span class="fc" id="L107">        conceptMeter.commit(m);</span>
+<span class="fc" id="L108">    }</span>
+
+<span class="nc" id="L110">    public static class ItemMeter&lt;I extends BudgetedHandle&gt; implements Consumer&lt;I&gt; {</span>
+
+<span class="nc" id="L112">        double prioritySum = 0;</span>
+<span class="nc" id="L113">        double prioritySumSq = 0;</span>
+        static final int histogramBins = 4;
+<span class="nc" id="L115">        @NotNull</span>
+        double[] histogram = new double[histogramBins];
+        int count;
+        private double mean;
+        private double variance;
+
+//        SummaryStatistics
+//                termLinkMassPerConcept = new SummaryStatistics(),
+//                termLinkMass = new SummaryStatistics(),
+//                taskLinkMassPerConcept = new SummaryStatistics(),
+//                taskLinkMass = new SummaryStatistics();
+
+        public void reset() {
+<span class="nc" id="L128">            count = 0;</span>
+<span class="nc" id="L129">            prioritySum = prioritySumSq = 0;</span>
+//            termLinkMassPerConcept.clear();
+//            termLinkMass.clear();
+//            taskLinkMassPerConcept.clear();
+//            taskLinkMass.clear();
+<span class="nc" id="L134">        }</span>
+
+        @Override
+        public void accept(@NotNull I c) {
+
+<span class="nc" id="L139">            double p = c.getPriority();</span>
+
+            //TODO totalGoals...
+            //TODO totalQuests...
+
+<span class="nc" id="L144">            prioritySum += p;</span>
+<span class="nc" id="L145">            prioritySumSq += p * p;</span>
+
+            //noinspection IfStatementWithTooManyBranches
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            if (p &gt; 0.75) {</span>
+<span class="nc" id="L149">                histogram[0]++;</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            } else if (p &gt; 0.5) {</span>
+<span class="nc" id="L151">                histogram[1]++;</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            } else if (p &gt; 0.25) {</span>
+<span class="nc" id="L153">                histogram[2]++;</span>
+            } else {
+<span class="nc" id="L155">                histogram[3]++;</span>
+            }
+
+<span class="nc" id="L158">            count++;</span>
+
+<span class="nc" id="L160">        }</span>
+
+        public void commit() {
+            double mean, variance;
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (count &gt; 0) {</span>
+<span class="nc" id="L165">                mean = prioritySum / count;</span>
+
+                //http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+<span class="nc" id="L168">                variance = (prioritySumSq - ((prioritySum * prioritySum) / count)) / (count - 1);</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                for (int i = 0; i &lt; histogram.length; i++) {</span>
+<span class="nc" id="L170">                    histogram[i] /= count;</span>
+                }
+            } else {
+<span class="nc" id="L173">                mean = variance = 0;</span>
+            }
+<span class="nc" id="L175">            this.mean = mean;</span>
+<span class="nc" id="L176">            this.variance = variance;</span>
+<span class="nc" id="L177">        }</span>
+
+        /** average priority */
+        public double getMean() {
+<span class="nc" id="L181">            return mean;</span>
+        }
+
+        /** variance in priority */
+        public double getVariance() {
+<span class="nc" id="L186">            return variance;</span>
+        }
+
+        /** priority histogram */
+        @NotNull
+        public double[] getHistogram() {
+<span class="nc" id="L192">            return histogram;</span>
+        }
+    }
+
+<span class="fc" id="L196">    public class ConceptMeter implements Consumer&lt;Concept&gt; {</span>
+
+<span class="fc" id="L198">        int count = 0;</span>
+<span class="fc" id="L199">        int totalQuestions = 0;</span>
+<span class="fc" id="L200">        int totalBeliefs = 0;</span>
+
+        public void reset() {
+<span class="fc" id="L203">            totalQuestions = totalBeliefs = 0;</span>
+<span class="fc" id="L204">            count = 0;</span>
+            //inputPriority.clear();
+<span class="fc" id="L206">        }</span>
+
+        @Override
+        public void accept(@Nullable Concept c) {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            if (c == null) return;</span>
+
+
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            if (c.hasQuestions())</span>
+<span class="nc" id="L214">                totalQuestions += c.getQuestions().size();</span>
+
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            if (c.hasBeliefs())</span>
+<span class="nc" id="L217">                totalBeliefs += c.getBeliefs().size();</span>
+
+
+//            float termLinksMass = c.getTermLinks().mass();
+//            int numTermLinks = c.getTermLinks().size();
+//            float taskLinksMass = c.getTaskLinks().mass();
+//            int numTaskLinks = c.getTaskLinks().size();
+//
+//            termLinkMassPerConcept.addValue(termLinksMass);
+//            termLinkMass.addValue((numTermLinks &gt; 0) ? termLinksMass / numTermLinks : 0);
+//            taskLinkMassPerConcept.addValue(taskLinksMass);
+//            taskLinkMass.addValue((numTaskLinks &gt; 0) ? taskLinksMass / numTaskLinks : 0);
+
+<span class="nc" id="L230">        }</span>
+
+
+
+        public void commit(@NotNull Memory m) {
+
+
+<span class="fc" id="L237">            CONCEPTS_ACTIVE.set(count);</span>
+<span class="fc" id="L238">            CONCEPTS_TOTAL.set(m.index.size());</span>
+//            TERMLINK_MASS_CONCEPT_MEAN.set(termLinkMassPerConcept.getMean());
+//            TERMLINK_MASS_MEAN.set(termLinkMass.getMean());
+//            TASKLINK_MASS_CONCEPT_MEAN.set(taskLinkMassPerConcept.getMean());
+//            TASKLINK_MASS_MEAN.set(taskLinkMass.getMean());
+<span class="fc" id="L243">            CONCEPT_BELIEF_COUNT.set(totalBeliefs);</span>
+<span class="fc" id="L244">            CONCEPT_QUESTION_COUNT.set(totalQuestions);</span>
+
+            //INPUT_PRIORITY_SUM.set(inputPriority.getSum());
+
+
+            //TODO
+            /*
+            setConceptPriorityMean(mean);
+            setConceptPriorityVariance(variance);
+            setConceptPriorityHistogram(histogram);
+            */
+<span class="fc" id="L255">        }</span>
+    }
+
+<span class="fc" id="L258">    public final ConceptMeter conceptMeter = new ConceptMeter();</span>
+
+
+
+
+//    @Override
+//    public void commit(Memory memory) {
+//        super.commit(memory);
+//        
+//        put(&quot;concept.count&quot;, conceptNum);
+//        
+//        put(&quot;concept.pri.mean&quot;, conceptPriorityMean);
+//        put(&quot;concept.pri.variance&quot;, conceptVariance);
+//        
+//        //in order; 0= top 25%, 1 = 50%..75%.., etc
+//        for (int n = 0; n &lt; conceptHistogram.length; n++)
+//            put(&quot;concept.pri.histo#&quot; + n, conceptHistogram[n]);
+//        
+//        put(&quot;concept.belief.mean&quot;, conceptNum &gt; 0 ? ((double)conceptBeliefsSum)/conceptNum : 0);
+//        put(&quot;concept.question.mean&quot;, conceptNum &gt; 0 ? ((double)conceptQuestionsSum)/conceptNum : 0);
+//        
+//        put(&quot;task.novel.total&quot;, memory.novelTasks.size());
+//        //put(&quot;memory.newtasks.total&quot;, memory.newTasks.size()); //redundant with output.tasks below
+//
+//        //TODO move to EmotionState
+//        put(&quot;emotion.happy&quot;, memory.emotion.happy());
+//        put(&quot;emotion.busy&quot;, memory.emotion.busy());
+//
+//        
+//        {
+//            //DataSet rule = TASKLINK_REASON.get();
+//            put(&quot;rule.fire.tasklink.pri.mean&quot;, TASKLINK_FIRE.mean());
+//            put(&quot;rule.fire.tasklinks&quot;, TASKLINK_FIRE.getHits());
+//            
+//            putHits(TERM_LINK_SELECT);
+//            
+//            //only makes commit as a mean, since it occurs multiple times during a cycle
+//            put(&quot;rule.tasktermlink.pri.mean&quot;, TERM_LINK_SELECT.mean());
+//        }
+//        {
+//            putValue(TASK_INPUT);
+//        }
+//        {            
+//            putHits(CONTRAPOSITION);
+//            
+//            //put(&quot;rule.contrapositions.complexity.mean&quot;, CONTRAPOSITION.get().mean());
+//            
+//            putHits(BELIEF_REVISION);
+//            put(&quot;rule.ded_2nd_layer_variable_unification_terms&quot;, DED_SECOND_LAYER_VARIABLE_UNIFICATION_TERMS.getHits());
+//            put(&quot;rule.ded_2nd_layer_variable_unification&quot;, DED_SECOND_LAYER_VARIABLE_UNIFICATION.getHits());
+//            put(&quot;rule.ded_conjunction_by_question&quot;, DED_CONJUNCTION_BY_QUESTION.getHits());
+//            
+//            putHits(ANALOGY);
+//        }
+//        {
+//            DataSet d = DERIVATION_LATENCY.get();
+//            double min = d.min();
+//            if (!Double.isFinite(min)) min = 0;
+//            double max = d.max();
+//            if (!Double.isFinite(max)) max = 0;
+//            
+//            put(DERIVATION_LATENCY.name() + &quot;.min&quot;, min);
+//            put(DERIVATION_LATENCY.name() + &quot;.max&quot;, max);
+//            put(DERIVATION_LATENCY.name() + &quot;.mean&quot;, d.mean());
+//        }
+//        {
+//            putHits(TASK_ADD_NEW);
+//            putHits(TASK_ADD_NOVEL);            
+//            put(&quot;task.derived&quot;, TASK_DERIVED.getHits());
+//            
+//            put(&quot;task.pri.mean#added&quot;, TASK_ADD_NEW.getReset().mean());
+//            put(&quot;task.pri.mean#derived&quot;, TASK_DERIVED.getReset().mean());
+//            put(&quot;task.pri.mean#executed&quot;, TASK_EXECUTED.getReset().mean());
+//            
+//            put(&quot;task.executed&quot;, TASK_EXECUTED.getHits());
+//            
+//            put(&quot;task.immediate.process&quot;, TASK_IMMEDIATE_PROCESS.getHits());
+//            //put(&quot;task.immediate_processed.pri.mean&quot;, TASK_IMMEDIATE_PROCESS.get().mean());
+//        }
+//        {
+//            put(&quot;task.link_to&quot;, LINK_TO_TASK.getHits());
+//            put(&quot;task.process#goal&quot;, GOAL_PROCESS.getHits());
+//            put(&quot;task.process#judgment&quot;, JUDGMENT_PROCESS.getHits());
+//            put(&quot;task.process#question&quot;, QUESTION_PROCESS.getHits());            
+//        }
+//        
+//        
+//        putHits(SHORT_TERM_MEMORY_UPDATE);
+//        
+//        {
+//            putHits(SOLUTION_BEST);
+//            put(&quot;task.solved.best.pri.mean&quot;, SOLUTION_BEST.get().mean());
+//        }
+//        
+//        
+//        {
+//            
+//            put(&quot;plan.graph#edge&quot;, PLAN_GRAPH_EDGE.getValue());
+//            put(&quot;plan.graph#vertex&quot;, PLAN_GRAPH_VERTEX.getValue());
+//            
+//            put(&quot;plan.graph.add#other&quot;, PLAN_GRAPH_IN_OTHER.getHits());
+//            put(&quot;plan.graph.add#operation&quot;, PLAN_GRAPH_IN_OPERATION.getHits());
+//            put(&quot;plan.graph.add#interval&quot;, PLAN_GRAPH_IN_DELAY_MAGNITUDE.getHits());
+//            put(&quot;plan.graph.in.delay_magnitude.mean&quot;, PLAN_GRAPH_IN_DELAY_MAGNITUDE.getReset().mean());
+//
+//            put(&quot;plan.task#executable&quot;, PLAN_TASK_EXECUTABLE.getReset().sum());
+//            put(&quot;plan.task#planned&quot;, PLAN_TASK_PLANNED.getReset().sum());
+//
+//        }
+//    }
+//    
+//    public void putValue(final ValueMeter s) {
+//        put(s.getName(), s.getValue());
+//    }
+//    public void putHits(final ValueMeter s) {
+//        put(s.getName(), s.getHits());
+//    }
+//    public void putMean(final ValueMeter s) {
+//        put(s.getName(), s.get().mean());
+//    }
+
+
+//    public void setConceptPriorityMean(double conceptPriorityMean) {
+//        this.conceptPriorityMean = conceptPriorityMean;
+//    }
+//
+////    public void setConceptPrioritySum(double conceptPrioritySum) {
+////        this.conceptPrioritySum = conceptPrioritySum;
+////    }
+//
+//
+//    public void setConceptPriorityVariance(double variance) {
+//        this.conceptVariance = variance;
+//    }
+//
+//    public void setConceptPriorityHistogram(double[] histogram) {
+//        this.conceptHistogram = histogram;
+//    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

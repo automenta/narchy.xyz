@@ -1,0 +1,673 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>AbstractTask.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.task</a> &gt; <span class="el_source">AbstractTask.java</span></div><h1>AbstractTask.java</h1><pre class="source lang-java linenums">package nars.task;
+
+import nars.Global;
+import nars.Memory;
+import nars.budget.Item;
+import nars.concept.Concept;
+import nars.nal.Tense;
+import nars.term.Term;
+import nars.term.Termed;
+import nars.term.compound.Compound;
+import nars.truth.DefaultTruth;
+import nars.truth.Stamp;
+import nars.truth.Truth;
+import nars.util.data.Util;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.lang.ref.Reference;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+import static nars.Global.dereference;
+import static nars.Global.reference;
+
+/**
+ * Default Task implementation
+ * TODO move all mutable methods to MutableTask and call this ImmutableTask
+ */
+public abstract class AbstractTask extends Item&lt;Task&gt;
+        implements Task, Temporal {
+
+    /** content term of this task */
+    private Termed&lt;Compound&gt; term;
+
+<span class="fc" id="L36">    @Nullable</span>
+    protected TaskState state = null;
+
+    private char punctuation;
+
+    private Truth truth;
+
+<span class="fc" id="L43">    @Nullable</span>
+    private long[] evidentialSet = null;
+
+<span class="fc" id="L46">    private long creationTime = Tense.TIMELESS;</span>
+<span class="fc" id="L47">    private long occurrenceTime = Tense.ETERNAL;</span>
+
+    /**
+     * Task from which the Task is derived, or null if input
+     */
+    protected transient Reference&lt;Task&gt; parentTask; //should this be transient? we may want a Special kind of Reference that includes at least the parent's Term
+    /**
+     * Belief from which the Task is derived, or null if derived from a theorem
+     */
+    protected transient Reference&lt;Task&gt; parentBelief;
+
+    private transient int hash;
+
+    /**
+     * TODO move to SolutionTask subclass
+     * For Question and Goal: best solution found so far
+     */
+    @Nullable
+    private transient Reference&lt;Task&gt; bestSolution;
+
+<span class="fc" id="L67">    @Nullable</span>
+    private List log = null;
+
+
+//    public AbstractTask(Compound term, char punctuation, Truth truth, Budget bv, Task parentTask, Task parentBelief, Task solution) {
+//        this(term, punctuation, truth,
+//                bv.getPriority(),
+//                bv.getDurability(),
+//                bv.getQuality(),
+//                parentTask, parentBelief,
+//                solution);
+//    }
+
+    public AbstractTask(Compound term, char punc, Truth truth, float p, float d, float q) {
+<span class="fc" id="L81">        this(term, punc, truth, p, d, q, (Task) null, null, null);</span>
+<span class="fc" id="L82">    }</span>
+
+    public AbstractTask(Compound term, char punc, Truth truth, float p, float d, float q, Task parentTask, Task parentBelief, Task solution) {
+<span class="fc" id="L85">        this(term, punc, truth,</span>
+                p, d, q,
+<span class="fc" id="L87">                Global.reference(parentTask),</span>
+<span class="fc" id="L88">                reference(parentBelief),</span>
+<span class="fc" id="L89">                reference(solution)</span>
+        );
+<span class="fc" id="L91">    }</span>
+
+    /** copy/clone constructor */
+    public AbstractTask(@NotNull Task task) {
+<span class="nc" id="L95">        this(task, task.getPunctuation(), task.getTruth(),</span>
+<span class="nc" id="L96">                task.getPriority(), task.getDurability(), task.getQuality(),</span>
+<span class="nc" id="L97">                task.getParentTaskRef(), task.getParentBeliefRef(), task.getBestSolutionRef());</span>
+<span class="nc" id="L98">        setEvidence(task.getEvidence());</span>
+<span class="nc" id="L99">    }</span>
+
+    @NotNull
+    @Override
+    public Task getTask() {
+<span class="fc" id="L104">        return this;</span>
+    }
+
+    void setTime(long creation, long occurrence) {
+<span class="fc" id="L108">        this.creationTime = creation;</span>
+
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        boolean changed = this.occurrenceTime!=occurrence;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (changed) {</span>
+<span class="nc" id="L112">            this.occurrenceTime = occurrence;</span>
+<span class="nc" id="L113">            invalidate();</span>
+        }
+
+        /*setCreationTime(creation);
+        setOccurrenceTime(occurrence);*/
+<span class="fc" id="L118">    }</span>
+
+
+    protected final void setTerm(Termed&lt;Compound&gt; t) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (term!=t) {</span>
+<span class="fc" id="L123">            term = t;</span>
+<span class="fc" id="L124">            invalidate();</span>
+        }
+<span class="fc" id="L126">    }</span>
+
+
+    public AbstractTask(Termed&lt;Compound&gt; term, char punctuation, Truth truth, float p, float d, float q, Reference&lt;Task&gt; parentTask, Reference&lt;Task&gt; parentBelief, Reference&lt;Task&gt; solution) {
+<span class="fc" id="L130">        super(p, d, q);</span>
+<span class="fc" id="L131">        this.truth = truth;</span>
+<span class="fc" id="L132">        this.punctuation = punctuation;</span>
+<span class="fc" id="L133">        this.term = term;</span>
+<span class="fc" id="L134">        this.parentTask = parentTask;</span>
+<span class="fc" id="L135">        this.parentBelief = parentBelief;</span>
+<span class="fc" id="L136">        this.bestSolution = solution;</span>
+<span class="fc" id="L137">        updateEvidence();</span>
+<span class="fc" id="L138">    }</span>
+
+    @Override
+    public final Task normalize(@NotNull Memory memory) {
+
+//        if (hash != 0) {
+//            /* already validated */
+//            return this;
+//        }
+
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (getDeleted())</span>
+<span class="nc" id="L149">            return null;</span>
+
+<span class="fc" id="L151">        Term t = term();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (!t.levelValid( memory.nal() ))</span>
+<span class="fc" id="L153">            return null;</span>
+
+
+<span class="fc" id="L156">        char punc = getPunctuation();</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (punc == 0)</span>
+<span class="nc" id="L158">            throw new RuntimeException(&quot;Punctuation must be specified before generating a default budget&quot;);</span>
+
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (!isCommand()) {</span>
+<span class="fc" id="L161">            ensureValidParentTaskRef();</span>
+        }
+
+        //noinspection IfStatementWithTooManyBranches
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (isJudgmentOrGoal()) {</span>
+
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        } else if (isQuestOrQuestion()) {</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (truth!=null)</span>
+<span class="nc" id="L169">                throw new RuntimeException(&quot;quests and questions must have null truth&quot;);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        } else if (isCommand()) {</span>
+            //..
+        } else {
+<span class="nc" id="L173">            throw new RuntimeException(&quot;invalid punctuation: &quot; + punc);</span>
+        }
+
+
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (t == null) throw new RuntimeException(&quot;null term&quot;);</span>
+
+        //normalize term
+<span class="fc" id="L180">        Termed normalizedTerm = (Termed) memory.index.normalized(t);</span>
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">        if ((normalizedTerm == null) || (!Task.validTaskTerm(normalizedTerm.term()))) {</span>
+<span class="fc" id="L182">            return null;</span>
+        }
+<span class="fc" id="L184">        setTerm(normalizedTerm);</span>
+
+
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">        if (truth == null &amp;&amp; isJudgmentOrGoal()) {</span>
+            //apply the default truth value for specified punctuation
+<span class="nc" id="L189">            truth = new DefaultTruth(punc, memory);</span>
+        }
+
+
+        // if a task has an unperceived creationTime,
+        // set it to the memory's current time here,
+        // and adjust occurenceTime if it's not eternal
+
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (getCreationTime() &lt;= Tense.TIMELESS) {</span>
+<span class="fc" id="L198">            long now = memory.time();</span>
+<span class="fc" id="L199">            long oc = getOccurrenceTime();</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if (oc != Tense.ETERNAL)</span>
+<span class="fc" id="L201">                oc += now;</span>
+
+<span class="fc" id="L203">            setTime(now, oc);</span>
+        }
+
+
+
+
+
+
+        //---- VALID TASK BEYOND THIS POINT
+
+        /** NaN quality is a signal that a budget's values need initialized */
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (!Float.isFinite(getQuality())) {</span>
+            //HACK for now just assume that only MutableTask supports unbudgeted input
+<span class="fc" id="L216">            memory.applyDefaultBudget((MutableTask)this);</span>
+        }
+
+
+
+        //finally, assign a unique stamp if none specified (input)
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (getEvidence() == null) {</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (!isInput()) {</span>
+<span class="nc" id="L224">                throw new RuntimeException(&quot;non-Input task without evidence: &quot; + this);</span>
+            } else {
+
+<span class="fc" id="L227">                setEvidence(memory.newStampSerial());</span>
+
+                //this actually means it arrived from unknown origin.
+                //we'll clarify what null evidence means later.
+                //if data arrives via a hardware device, can a virtual
+                //task be used as the parent when it generates it?
+                //doesnt everything originate from something else?
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                if (log == null)</span>
+<span class="fc" id="L235">                    log(&quot;Input&quot;);</span>
+            }
+        }
+
+
+        //hash = rehash();
+
+<span class="fc" id="L242">        onNormalized(memory);</span>
+
+<span class="fc" id="L244">        return this;</span>
+    }
+
+    @Nullable
+    @Override
+    public TaskState getState() {
+<span class="fc" id="L250">        return state;</span>
+    }
+
+    @Override
+    public void setExecuted() {
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (state==TaskState.Executed)</span>
+<span class="nc" id="L256">            throw new RuntimeException(&quot;can not execute already executed&quot;);</span>
+
+<span class="fc" id="L258">        state = TaskState.Executed;</span>
+<span class="fc" id="L259">    }</span>
+
+    /** can be overridden in subclasses to handle this event */
+    protected void onNormalized(Memory m) {
+
+<span class="fc" id="L264">    }</span>
+
+    protected final void setPunctuation(char punctuation) {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (this.punctuation!=punctuation) {</span>
+<span class="fc" id="L268">            this.punctuation = punctuation;</span>
+<span class="fc" id="L269">            invalidate();</span>
+        }
+<span class="fc" id="L271">    }</span>
+
+    /** includes: evidentialset, occurrencetime, truth, term, punctuation */
+    private int rehash() {
+
+<span class="fc" id="L276">        int h = Objects.hash(</span>
+<span class="fc" id="L277">                Arrays.hashCode(getEvidence()),</span>
+<span class="fc" id="L278">                term(),</span>
+<span class="fc" id="L279">                getPunctuation(),</span>
+<span class="fc" id="L280">                getTruth(),</span>
+<span class="fc" id="L281">                getOccurrenceTime()</span>
+        );
+
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (h == 0) return 1; //reserve 0 for non-hashed</span>
+
+<span class="fc" id="L286">        return h;</span>
+    }
+
+    @Override
+    public final void onConcept(Concept c) {
+
+        //intermval generally contains unique information that should not be replaced
+        //if (term instanceof TermMetadata)
+            //return;
+
+        //if debug, check that they are equal..
+        //term = (Compound) c.getTerm(); //HACK the cast
+<span class="fc" id="L298">    }</span>
+
+
+    @Override public final Termed concept() {
+<span class="fc" id="L302">        return term;</span>
+    }
+
+    @Override
+    public final Compound term() {
+<span class="fc" id="L307">        return term.term();</span>
+    }
+
+    @Override
+    public Truth getTruth() {
+<span class="fc" id="L312">        return truth;</span>
+    }
+
+    @Override
+    public void setTruth(Truth t) {
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (!Objects.equals(truth, t)) {</span>
+<span class="fc" id="L318">            truth = t;</span>
+<span class="fc" id="L319">            invalidate();</span>
+        }
+<span class="fc" id="L321">    }</span>
+
+    @Override
+    public final boolean isAnticipated() {
+<span class="nc bnc" id="L325" title="All 6 branches missed.">        return isJudgmentOrGoal() &amp;&amp; (getState() == TaskState.Anticipated || isInput());</span>
+    }
+
+    @NotNull
+    protected Task setEvidence(long... evidentialSet) {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (this.evidentialSet!=evidentialSet) {</span>
+<span class="fc" id="L331">            this.evidentialSet = evidentialSet;</span>
+<span class="fc" id="L332">            invalidate();</span>
+        }
+<span class="fc" id="L334">        return this;</span>
+    }
+
+    @Override
+    public final boolean isDouble() {
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        return getParentBelief() != null;</span>
+    }
+
+    @Override
+    public final boolean isSingle() {
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        return getParentBelief()==null;</span>
+    }
+
+
+
+    @NotNull
+    @Override
+    public Task log(@Nullable List historyToCopy) {
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (!Global.DEBUG_TASK_LOG)</span>
+<span class="nc" id="L353">            return this;</span>
+
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (historyToCopy != null) {</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            if (log == null) log = Global.newArrayList(historyToCopy.size());</span>
+<span class="nc" id="L357">            log.addAll(historyToCopy);</span>
+        }
+<span class="nc" id="L359">        return this;</span>
+    }
+
+    @Override
+    public final char getPunctuation() {
+<span class="fc" id="L364">        return punctuation;</span>
+    }
+
+    @Nullable
+    @Override
+    public final long[] getEvidence() {
+<span class="fc" id="L370">        long[] e = this.evidentialSet;</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        if (e == null) {</span>
+<span class="fc" id="L372">            updateEvidence();</span>
+<span class="fc" id="L373">            e = this.evidentialSet;</span>
+        }
+<span class="fc" id="L375">        return e;</span>
+    }
+
+    @Override
+    public final long getCreationTime() {
+<span class="fc" id="L380">        return creationTime;</span>
+    }
+
+    @Override
+    public final long getOccurrenceTime() {
+<span class="fc" id="L385">        return occurrenceTime;</span>
+    }
+
+
+    @Override
+    public int compareTo(Object obj) {
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        if (this == obj) return 0;</span>
+
+<span class="fc" id="L393">        Task o = (Task)obj;</span>
+<span class="fc" id="L394">        int tt = term().compareTo(o.term());</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (tt != 0) return tt;</span>
+
+<span class="fc" id="L397">        int tc = Character.compare(punctuation, o.getPunctuation());</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (tc != 0) return tc;</span>
+
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">        if (truth!=null) {</span>
+<span class="fc" id="L401">            int tu = Truth.compare(o.getTruth(), truth);</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (tu!=0) return tu;</span>
+        }
+
+<span class="nc" id="L405">        int to = Long.compare( getOccurrenceTime(), o.getOccurrenceTime() );</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        if (to!=0) return to;</span>
+
+<span class="nc" id="L408">        return Util.compare(getEvidence(), o.getEvidence());</span>
+    }
+
+    @NotNull
+    @Override
+    public final Task setCreationTime(long creationTime) {
+<span class="pc bpc" id="L414" title="1 of 4 branches missed.">        if ((this.creationTime &lt;= Tense.TIMELESS) &amp;&amp; (occurrenceTime &gt; Tense.TIMELESS)) {</span>
+            //use the occurrence time as the delta, now that this has a &quot;finite&quot; creationTime
+<span class="nc" id="L416">            setOccurrenceTime(occurrenceTime + creationTime);</span>
+        }
+        //if (this.creationTime != creationTime) {
+<span class="fc" id="L419">        this.creationTime = creationTime;</span>
+            //does not need invalidated since creation time is not part of hash
+        //}
+<span class="fc" id="L422">        return this;</span>
+    }
+
+
+    final void updateEvidence() {
+        //supplying no evidence will be assigned a new serial
+        //but this should only happen for input tasks (with no parent)
+
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        if (getParentTask()!=null) {</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            if (isDouble())</span>
+<span class="fc" id="L432">                setEvidence( Stamp.toSetArray( Stamp.zip(getParentTask(), getParentBelief() )));</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            else if ( isSingle() )</span>
+<span class="fc" id="L434">                setEvidence(getParentTask().getEvidence());</span>
+        } else {
+<span class="fc" id="L436">            setEvidence(null);</span>
+        }
+
+<span class="fc" id="L439">    }</span>
+
+    public final void invalidate() {
+<span class="fc" id="L442">        hash = 0;</span>
+<span class="fc" id="L443">    }</span>
+
+    @Override
+    public void setOccurrenceTime(long o) {
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (o != occurrenceTime) {</span>
+<span class="fc" id="L448">            this.occurrenceTime = o;</span>
+<span class="fc" id="L449">            invalidate();</span>
+        }
+<span class="fc" id="L451">    }</span>
+
+    @Override
+    public final void setEternal() {
+<span class="fc" id="L455">        setOccurrenceTime(Tense.ETERNAL);</span>
+<span class="fc" id="L456">    }</span>
+
+
+    @Override
+    public final int hashCode() {
+<span class="fc" id="L461">        int h = this.hash;</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (h == 0) {</span>
+<span class="fc" id="L463">            return this.hash = rehash();</span>
+        }
+<span class="fc" id="L465">        return h;</span>
+    }
+
+    /**
+     * To check whether two sentences are equal
+     * Must be consistent with the values calculated in getHash()
+     *
+     * @param that The other sentence
+     * @return Whether the two sentences have the same content
+     */
+    @Override
+    public final boolean equals(@NotNull Object that) {
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (this == that) return true;</span>
+        //if (that instanceof Task) {
+
+            //hash test has probably already occurred, coming from a HashMap
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            if (hashCode() != that.hashCode()) return false;</span>
+
+<span class="fc" id="L483">            return equivalentTo((Task) that, true, true, true, true, false);</span>
+        //}
+        //return false;
+    }
+
+    @Override
+    public final boolean equivalentTo(@NotNull Task that, boolean punctuation, boolean term, boolean truth, boolean stamp, boolean creationTime) {
+
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">        if (this == that) return true;</span>
+
+<span class="fc" id="L493">        char thisPunc = getPunctuation();</span>
+
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">        if (stamp) {</span>
+            //uniqueness includes every aspect of stamp except creation time
+            //&lt;patham9&gt; if they are only different in creation time, then they are the same
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">            if (!equalStamp(that, true, creationTime, true))</span>
+<span class="nc" id="L499">                return false;</span>
+        }
+
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (truth) {</span>
+<span class="fc" id="L503">            Truth thisTruth = getTruth();</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">            if (thisTruth == null) {</span>
+                //equal punctuation will ensure thatTruth is also null
+            } else {
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">                if (!thisTruth.equals(that.getTruth())) return false;</span>
+            }
+        }
+
+
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (term) {</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">            if (!term().equals(that.term())) return false;</span>
+        }
+
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        if (punctuation) {</span>
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">            if (thisPunc != that.getPunctuation()) return false;</span>
+        }
+
+<span class="fc" id="L520">        return true;</span>
+    }
+
+    /**
+     * Check if two stamps contains the same types of content
+     * &lt;p&gt;
+     * NOTE: hashcode will include within it the creationTime &amp; occurrenceTime, so if those are not to be compared then avoid comparing hash
+     *
+     * @param s The Stamp to be compared
+     * @return Whether the two have contain the same evidential base
+     */
+    public final boolean equalStamp(@NotNull Task s, boolean evidentialSet, boolean creationTime, boolean occurrenceTime) {
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">        if (this == s) return true;</span>
+
+        /*if (hash &amp;&amp; (!occurrenceTime || !evidentialSet))
+            throw new RuntimeException(&quot;Hash equality test must be followed by occurenceTime and evidentialSet equality since hash incorporates them&quot;);
+
+        if (hash)
+            if (hashCode() != s.hashCode()) return false;*/
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">        if (creationTime)</span>
+<span class="nc bnc" id="L540" title="All 2 branches missed.">            if (getCreationTime() != s.getCreationTime()) return false;</span>
+<span class="pc bpc" id="L541" title="1 of 2 branches missed.">        if (occurrenceTime)</span>
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">            if (getOccurrenceTime() != s.getOccurrenceTime()) return false;</span>
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">        if (evidentialSet) {</span>
+<span class="fc" id="L544">            return Arrays.equals(getEvidence(), s.getEvidence());</span>
+        }
+
+
+<span class="nc" id="L548">        return true;</span>
+    }
+
+
+    @Override
+    public Reference&lt;Task&gt; getParentTaskRef() {
+<span class="fc" id="L554">        return parentTask;</span>
+    }
+
+    @Override
+    public Reference&lt;Task&gt; getParentBeliefRef() {
+<span class="fc" id="L559">        return parentBelief;</span>
+    }
+
+    @Nullable
+    @Override
+    public Reference&lt;Task&gt; getBestSolutionRef() {
+<span class="nc" id="L565">        return bestSolution;</span>
+    }
+
+    /**
+     * Get the best-so-far solution for a Question or Goal
+     *
+     * @return The stored Sentence or null
+     */
+    @Nullable
+    @Override
+    public Task getBestSolution() {
+<span class="fc" id="L576">        return dereference(bestSolution);</span>
+    }
+
+    /**
+     * Set the best-so-far solution for a Question or Goal, and report answer
+     * for input question
+     *
+     * @param judg The solution to be remembered
+     */
+    @Override
+    public final void setBestSolution(Task judg) {
+
+<span class="fc" id="L588">        bestSolution = reference(judg);</span>
+        //InternalExperience.experienceFromBelief(memory, this, judg);
+<span class="fc" id="L590">    }</span>
+
+
+
+    /**
+     * append an entry to this task's log history
+     * useful for debugging but can also be applied to meta-analysis
+     * ex: an entry might be a String describing a change in the story/history
+     * of the Task and the reason for it.
+     */
+    @NotNull
+    @Override
+    public final Task log(Object entry) {
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">        if (!Global.DEBUG_TASK_LOG)</span>
+<span class="nc" id="L604">            return this;</span>
+
+        //TODO parameter for max history length, although task history should not grow after they are crystallized with a concept
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (log == null)</span>
+<span class="fc" id="L608">            log = Global.newArrayList(1);</span>
+
+<span class="fc" id="L610">        log.add(entry);</span>
+<span class="fc" id="L611">        return this;</span>
+    }
+
+    @Nullable
+    @Override
+    public final List getLog() {
+<span class="fc" id="L617">        return log;</span>
+    }
+
+
+    /*
+    @Override
+    public void delete() {
+        super.delete();
+//        this.parentBelief = this.parentTask = this.bestSolution = null;
+//        this.cause = null;
+//        log.clear();
+//        this.term = null;
+//        this.truth = null;
+//        this.hash = 0;
+    }*/
+
+
+
+    /**
+     * Get the parent belief of a task
+     *
+     * @return The belief from which the task is derived
+     */
+    @Nullable
+    @Override
+    public final Task getParentBelief() {
+<span class="fc" id="L643">        return dereference(parentBelief);</span>
+    }
+
+
+
+    @NotNull
+    @Override
+    public final Task name() {
+<span class="nc" id="L651">        return this;</span>
+    }
+
+    @NotNull
+    @Override
+    @Deprecated
+    public String toString() {
+<span class="fc" id="L658">        return appendTo(null, null).toString();</span>
+    }
+
+    @Override
+    public long start() {
+<span class="fc" id="L663">        return occurrenceTime;</span>
+    }
+
+    @Override
+    public long end() {
+<span class="fc" id="L668">        return occurrenceTime;// + duration;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

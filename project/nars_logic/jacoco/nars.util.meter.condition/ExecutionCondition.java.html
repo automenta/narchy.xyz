@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>ExecutionCondition.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.util.meter.condition</a> &gt; <span class="el_source">ExecutionCondition.java</span></div><h1>ExecutionCondition.java</h1><pre class="source lang-java linenums">package nars.util.meter.condition;
+
+import nars.NAR;
+import nars.nal.Tense;
+import nars.term.atom.Atom;
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * measures the occurrence of an execution within certain
+ * time and expectation ranges
+ */
+public class ExecutionCondition implements NARCondition {
+
+    private final Atom opTerm;
+    private final long start, end;
+    private final float minExpect, maxExpect;
+<span class="fc" id="L17">    private boolean success = false;</span>
+<span class="fc" id="L18">    private long successTime = Tense.TIMELESS;</span>
+
+<span class="fc" id="L20">    public ExecutionCondition(@NotNull NAR n, long start, long end, Atom opTerm, float minExpect, float maxExpect) {</span>
+
+<span class="fc" id="L22">        this.start = start;</span>
+<span class="fc" id="L23">        this.end = end;</span>
+<span class="fc" id="L24">        this.opTerm = opTerm;</span>
+<span class="fc" id="L25">        this.minExpect = minExpect;</span>
+<span class="fc" id="L26">        this.maxExpect = maxExpect;</span>
+
+<span class="fc" id="L28">        n.onExec(opTerm, t -&gt; {</span>
+
+<span class="nc bnc" id="L30" title="All 2 branches missed.">            if (!success) {</span>
+<span class="nc" id="L31">                long now = n.time();</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">                if ((now &gt;= start) &amp;&amp; (now &lt;= end)) {</span>
+<span class="nc" id="L33">                    float expect = t.task.getExpectation();</span>
+<span class="nc bnc" id="L34" title="All 4 branches missed.">                    if ((expect &gt;= minExpect) &amp;&amp; (expect &lt;= maxExpect)) {</span>
+<span class="nc" id="L35">                        success = true;</span>
+<span class="nc" id="L36">                        successTime = now;</span>
+                    }
+                }
+            }
+<span class="nc" id="L40">        });</span>
+
+<span class="fc" id="L42">    }</span>
+
+    @Override
+    public long getSuccessTime() {
+<span class="nc" id="L46">        return successTime;</span>
+    }
+
+    @Override
+    public boolean isTrue() {
+<span class="nc" id="L51">        return success;</span>
+    }
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="nc" id="L57">        return getClass().getSimpleName() + '[' + opTerm + &quot;, time in &quot; +</span>
+                start + &quot;..&quot; + end + &quot;, expect in &quot; + minExpect + &quot;..&quot; + maxExpect +
+                //minExpect, maxExpect
+                ']';
+    }
+
+    @Override
+    public long getFinalCycle() {
+<span class="nc" id="L65">        return end;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

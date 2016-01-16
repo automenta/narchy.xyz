@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>BLink.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars.bag</a> &gt; <span class="el_source">BLink.java</span></div><h1>BLink.java</h1><pre class="source lang-java linenums">package nars.bag;
+
+import nars.budget.Budget;
+import nars.budget.UnitBudget;
+import nars.data.BudgetedStruct;
+import nars.nal.Tense;
+import org.jetbrains.annotations.NotNull;
+
+import static nars.util.data.Util.clamp;
+
+/**
+ * Budgeted Link (an entry in a bag)
+ * equalsTo/hashCode proxies to the wrapped element, X id
+ *
+ * Acts as a &quot;budget vector&quot; containing an accumulating delta
+ * that can be commit()'d on the next udpate
+ */
+public final class BLink&lt;X&gt; extends Budget implements Link&lt;X&gt; {
+
+<span class="fc" id="L20">    private final float[] b = new float[6];</span>
+    public final X id;
+<span class="fc" id="L22">    private long lastForget = Tense.TIMELESS;</span>
+
+<span class="fc" id="L24">    public BLink(X id) {</span>
+<span class="fc" id="L25">        this.id = id;</span>
+<span class="fc" id="L26">    }</span>
+
+    public BLink(X id, float p, float d, float q) {
+<span class="fc" id="L29">        this(id);</span>
+<span class="fc" id="L30">        init(p, d, q);</span>
+<span class="fc" id="L31">    }</span>
+
+    public BLink(X id, @NotNull BudgetedStruct b) {
+<span class="fc" id="L34">        this(id);</span>
+<span class="fc" id="L35">        init(b, 1f);</span>
+<span class="fc" id="L36">    }</span>
+
+    public BLink(X id, @NotNull BudgetedStruct b, float scale) {
+<span class="fc" id="L39">        this(id);</span>
+<span class="fc" id="L40">        init(b, scale);</span>
+<span class="fc" id="L41">    }</span>
+
+    @Override
+    public X get() {
+<span class="fc" id="L45">        return id;</span>
+    }
+
+    private void init(@NotNull BudgetedStruct c, float scale) {
+        //this.lastForget = c.getLastForgetTime();
+<span class="fc" id="L50">        this.lastForget = Tense.TIMELESS;</span>
+
+
+<span class="fc" id="L53">        init(c.getPriority() * scale, c.getDurability(), c.getQuality());</span>
+<span class="fc" id="L54">    }</span>
+
+    public void init(float p, float d, float q) {
+<span class="fc" id="L57">        float[] b = this.b;</span>
+<span class="fc" id="L58">        b[0] = clamp(p);</span>
+<span class="fc" id="L59">        b[1] = clamp(d);</span>
+<span class="fc" id="L60">        b[2] = clamp(q);</span>
+<span class="fc" id="L61">    }</span>
+
+    private void clearDelta() {
+<span class="fc" id="L64">        float[] b = this.b;</span>
+<span class="fc" id="L65">        b[3] = b[4] = b[5] = 0;</span>
+<span class="fc" id="L66">    }</span>
+
+    public void commit() {
+<span class="fc" id="L69">        float[] b = this.b;</span>
+<span class="fc" id="L70">        b[0] = clamp(b[0] + b[3]);</span>
+<span class="fc" id="L71">        b[1] = clamp(b[1] + b[4]);</span>
+<span class="fc" id="L72">        b[2] = clamp(b[2] + b[5]);</span>
+<span class="fc" id="L73">        clearDelta();</span>
+<span class="fc" id="L74">    }</span>
+
+    @Override public final float getScore() {
+<span class="nc" id="L77">        return getPriority();</span>
+    }
+
+    @Override
+    public final float getPriority() {
+<span class="fc" id="L82">        return b[0];</span>
+    }
+
+    @Override
+    public void setPriority(float p) {
+<span class="fc" id="L87">        float[] b = this.b;</span>
+<span class="fc" id="L88">        b[3] += (clamp(p)-b[0]);</span>
+<span class="fc" id="L89">    }</span>
+
+    @Override
+    public float getDurability() {
+<span class="fc" id="L93">        return b[1];</span>
+    }
+
+    @Override
+    public void setDurability(float d) {
+<span class="fc" id="L98">        float[] b = this.b;</span>
+<span class="fc" id="L99">        b[4] += (clamp(d)-b[1]);</span>
+<span class="fc" id="L100">    }</span>
+
+    @Override
+    public float getQuality() {
+<span class="fc" id="L104">        return b[2];</span>
+    }
+
+    @Override
+    public void setQuality(float q) {
+<span class="fc" id="L109">        float[] b = this.b;</span>
+<span class="fc" id="L110">        b[5] += (clamp(q)-b[2]);</span>
+<span class="fc" id="L111">    }</span>
+
+    @Override
+    public long setLastForgetTime(long currentTime) {
+<span class="fc" id="L115">        long lastForget = this.lastForget;</span>
+        long diff;
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (lastForget == Tense.TIMELESS) {</span>
+<span class="fc" id="L118">            diff = 0;</span>
+        } else {
+<span class="fc" id="L120">            diff = currentTime - lastForget;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (diff == 0) return 0;</span>
+        }
+<span class="fc" id="L123">        this.lastForget = currentTime;</span>
+<span class="fc" id="L124">        return diff;</span>
+    }
+
+    @Override
+    public long getLastForgetTime() {
+<span class="nc" id="L129">        return lastForget;</span>
+    }
+
+
+    @NotNull
+    @Override
+    public UnitBudget clone() {
+<span class="nc" id="L136">        return new UnitBudget(this);</span>
+    }
+
+
+    @Override public boolean equals(Object obj) {
+//        /*if (obj instanceof Budget)*/ {
+//            return equalsBudget((Budget) obj);
+//        }
+//        return id.equals(((BagBudget)obj).id);
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        return obj == this;</span>
+    }
+
+    @Override public int hashCode() {
+<span class="fc" id="L149">        return id.hashCode();</span>
+    }
+
+    @NotNull
+    @Override
+    public String toString() {
+<span class="fc" id="L155">        return id + &quot;=&quot; + getBudgetString();</span>
+    }
+
+    public boolean hasDelta() {
+<span class="fc" id="L159">        float[] b = this.b;</span>
+<span class="fc bfc" id="L160" title="All 6 branches covered.">        return nonZero(b[3]) || nonZero(b[4]) || nonZero(b[5]);</span>
+    }
+
+    static boolean nonZero(float x) {
+        //return (Math.abs(x) &gt; Global.BUDGET_EPSILON);
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        return x!=0f;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>

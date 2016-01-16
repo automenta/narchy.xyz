@@ -1,0 +1,1311 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>Narsese.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">OpenNARS Logic Reasoner</a> &gt; <a href="index.source.html" class="el_package">nars</a> &gt; <span class="el_source">Narsese.java</span></div><h1>Narsese.java</h1><pre class="source lang-java linenums">package nars;
+
+import com.github.fge.grappa.Grappa;
+import com.github.fge.grappa.annotations.Cached;
+import com.github.fge.grappa.matchers.MatcherType;
+import com.github.fge.grappa.matchers.base.AbstractMatcher;
+import com.github.fge.grappa.parsers.BaseParser;
+import com.github.fge.grappa.rules.Rule;
+import com.github.fge.grappa.run.ListeningParseRunner3;
+import com.github.fge.grappa.run.ParseRunner;
+import com.github.fge.grappa.run.ParsingResult;
+import com.github.fge.grappa.run.context.MatcherContext;
+import com.github.fge.grappa.stack.DefaultValueStack;
+import com.github.fge.grappa.stack.ValueStack;
+import com.github.fge.grappa.support.Var;
+import nars.nal.Tense;
+import nars.nal.meta.PremiseRule;
+import nars.nal.nal8.Operator;
+import nars.nal.nal8.operator.ImmediateOperator;
+import nars.op.io.echo;
+import nars.task.MutableTask;
+import nars.task.Task;
+import nars.term.*;
+import nars.term.atom.Atom;
+import nars.term.compound.Compound;
+import nars.term.match.EllipsisOneOrMore;
+import nars.term.match.EllipsisTransform;
+import nars.term.match.EllipsisZeroOrMore;
+import nars.term.match.VarPattern;
+import nars.term.variable.Variable;
+import nars.truth.DefaultTruth;
+import nars.truth.Truth;
+import nars.util.Texts;
+import nars.util.data.list.FasterList;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Consumer;
+
+import static nars.Op.*;
+import static nars.Symbols.*;
+
+/**
+ * NARese, syntax and language for interacting with a NAR in NARS.
+ * https://code.google.com/p/open-nars/wiki/InputOutputFormat
+ */
+<span class="fc" id="L51">public class Narsese extends BaseParser&lt;Object&gt; {</span>
+
+
+    //These should be set to something like RecoveringParseRunner for performance
+<span class="fc" id="L55">    private final ParseRunner inputParser = new ListeningParseRunner3(Input());</span>
+<span class="fc" id="L56">    private final ParseRunner singleTaskParser = new ListeningParseRunner3(Task());</span>
+<span class="fc" id="L57">    private final ParseRunner singleTermParser = new ListeningParseRunner3(Term());</span>
+    //private final ParseRunner singleTaskRuleParser = new ListeningParseRunner3(TaskRule());
+
+
+<span class="fc" id="L61">    static final ThreadLocal&lt;Narsese&gt; parsers = ThreadLocal.withInitial(() -&gt; Grappa.createParser(Narsese.class));</span>
+
+    public static Narsese the() {
+<span class="fc" id="L64">        return parsers.get();</span>
+    }
+
+    @Nullable
+    public static Task makeTask(@NotNull Memory memory, @Nullable float[] b, Termed content, char p, @Nullable Truth t, @NotNull Tense tense) {
+
+//        if (p == null)
+//            throw new RuntimeException(&quot;character is null&quot;);
+//
+//        if ((t == null) &amp;&amp; ((p == JUDGMENT) || (p == GOAL)))
+//            t = new DefaultTruth(p);
+//
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        int blen = b != null ? b.length : 0;</span>
+//        if ((blen &gt; 0) &amp;&amp; (Float.isFinite(b[0])))
+//            blen = 0;
+//
+
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!(content instanceof Compound)) {</span>
+<span class="nc" id="L82">            return null;</span>
+        }
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L86">            t = memory.newDefaultTruth(p);</span>
+        }
+
+<span class="fc" id="L89">        MutableTask ttt =</span>
+                new MutableTask(content)
+<span class="fc" id="L91">                        .punctuation(p)</span>
+<span class="fc" id="L92">                        .truth(t)</span>
+<span class="fc" id="L93">                        .time(</span>
+<span class="fc" id="L94">                                memory.time(), //creation time</span>
+<span class="fc" id="L95">                                Tense.getOccurrenceTime(</span>
+                                        tense,
+                                        memory
+                                ));
+
+<span class="fc bfc" id="L100" title="All 4 branches covered.">        switch (blen) {</span>
+            case 0:     /* do not set, Memory will apply defaults */
+<span class="fc" id="L102">                break;</span>
+            case 1:
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">                if ((p == Symbols.QUEST || p == Symbols.QUESTION)) {</span>
+<span class="nc" id="L105">                    ttt.budget(b[0],</span>
+<span class="nc" id="L106">                            memory.getDefaultDurability(p),</span>
+<span class="nc" id="L107">                            memory.getDefaultQuality(p));</span>
+
+                } else {
+<span class="fc" id="L110">                    ttt.budget(b[0],</span>
+<span class="fc" id="L111">                            memory.getDefaultDurability(p));</span>
+                }
+<span class="fc" id="L113">                break;</span>
+            case 2:
+<span class="fc" id="L115">                ttt.budget(b[1], b[0]);</span>
+<span class="fc" id="L116">                break;</span>
+            default:
+<span class="fc" id="L118">                ttt.budget(b[2], b[1], b[0]);</span>
+                break;
+        }
+
+<span class="fc" id="L122">        return ttt;</span>
+    }
+
+
+    public Rule Input() {
+<span class="fc" id="L127">        return sequence(</span>
+<span class="fc" id="L128">                zeroOrMore( //1 or more?</span>
+                        //sequence(
+<span class="fc" id="L130">                        firstOf(</span>
+<span class="fc" id="L131">                                LineComment(),</span>
+<span class="fc" id="L132">                                Task()</span>
+                        ),
+<span class="fc" id="L134">                        s()</span>
+                        //)
+<span class="fc" id="L136">                ), eof());</span>
+    }
+
+    /**
+     * {Premise1,Premise2} |- Conclusion.
+     */
+    public Rule TaskRule() {
+
+        //use a var to count how many rule conditions so that they can be pulled off the stack without reallocating an arraylist
+<span class="nc" id="L145">        return sequence(</span>
+<span class="nc" id="L146">                STATEMENT_OPENER, s(),</span>
+<span class="nc" id="L147">                push(PremiseRule.class),</span>
+
+<span class="nc" id="L149">                Term(), //cause</span>
+
+<span class="nc" id="L151">                zeroOrMore(sepArgSep(), Term()),</span>
+<span class="nc" id="L152">                s(), TASK_RULE_FWD, s(),</span>
+
+<span class="nc" id="L154">                push(PremiseRule.class), //stack marker</span>
+
+<span class="nc" id="L156">                Term(), //effect</span>
+
+<span class="nc" id="L158">                zeroOrMore(sepArgSep(), Term()),</span>
+<span class="nc" id="L159">                s(), STATEMENT_CLOSER,</span>
+
+<span class="nc" id="L161">                push(popTaskRule())</span>
+        );
+    }
+
+
+    @Nullable
+    public PremiseRule popTaskRule() {
+        //(Term)pop(), (Term)pop()
+
+<span class="fc" id="L170">        List&lt;Term&gt; r = Global.newArrayList(1);</span>
+<span class="fc" id="L171">        List&lt;Term&gt; l = Global.newArrayList(1);</span>
+
+        Object popped;
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        while ((popped = pop()) != PremiseRule.class) { //lets go back till to the start now</span>
+<span class="fc" id="L175">            r.add((Term) popped);</span>
+        }
+
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        while ((popped = pop()) != PremiseRule.class) {</span>
+<span class="fc" id="L179">            l.add((Term) popped);</span>
+        }
+
+<span class="fc" id="L182">        Collections.reverse(l);</span>
+<span class="fc" id="L183">        Collections.reverse(r);</span>
+
+        Compound premise;
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (l.size() &gt;= 1) {</span>
+<span class="fc" id="L187">            premise = $.p(l);</span>
+        } else {
+            //empty premise list is invalid
+<span class="nc" id="L190">            return null;</span>
+        }
+
+        Compound conclusion;
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (r.size() &gt;= 1) {</span>
+<span class="fc" id="L195">            conclusion = $.p(r);</span>
+        } else {
+            //empty premise list is invalid
+<span class="nc" id="L198">            return null;</span>
+        }
+
+<span class="fc" id="L201">        return new PremiseRule(premise, conclusion);</span>
+    }
+
+    public Rule LineComment() {
+<span class="fc" id="L205">        return sequence(</span>
+<span class="fc" id="L206">                s(),</span>
+                //firstOf(
+                &quot;//&quot;,
+                //&quot;'&quot;,
+                //sequence(&quot;***&quot;, zeroOrMore('*')), //temporary
+                //&quot;OUT:&quot;
+                //),
+                //sNonNewLine(),
+<span class="fc" id="L214">                LineCommentEchoed(),</span>
+<span class="fc" id="L215">                firstOf(&quot;\n&quot;, eof() /* may not have newline at end of file */)</span>
+        );
+    }
+
+    public Rule LineCommentEchoed() {
+<span class="nc" id="L220">        return sequence(</span>
+<span class="nc" id="L221">            zeroOrMore(noneOf(&quot;\n&quot;)),</span>
+<span class="nc" id="L222">            push(ImmediateOperator.command(echo.class, Atom.quote(match())))</span>
+        );
+    }
+
+//    public Rule PauseInput() {
+//        return sequence( s(), IntegerNonNegative(),
+//                push( PauseInput.pause( (Integer) pop() ) ), sNonNewLine(),
+//                &quot;\n&quot; );
+//    }
+
+
+//    public Rule TermEOF() {
+//        return sequence( s(), Term(), s(), eof() );
+//    }
+//    public Rule TaskEOF() {
+//        return sequence( s(), Task(), s(), eof() );
+//    }
+
+    public Rule Task() {
+
+<span class="nc" id="L242">        Var&lt;float[]&gt; budget = new Var();</span>
+<span class="nc" id="L243">        Var&lt;Character&gt; punc = new Var();</span>
+<span class="nc" id="L244">        Var&lt;Term&gt; term = new Var();</span>
+<span class="nc" id="L245">        Var&lt;Truth&gt; truth = new Var();</span>
+<span class="nc" id="L246">        Var&lt;Tense&gt; tense = new Var(Tense.Eternal);</span>
+
+<span class="nc" id="L248">        return sequence(</span>
+<span class="nc" id="L249">                s(),</span>
+
+<span class="nc" id="L251">                optional(Budget(budget)),</span>
+
+
+<span class="nc" id="L254">                Term(true, false),</span>
+<span class="nc" id="L255">                term.set((Term) pop()),</span>
+
+<span class="nc" id="L257">                SentencePunctuation(punc),</span>
+
+<span class="nc" id="L259">                optional(</span>
+<span class="nc" id="L260">                        s(), Tense(tense)</span>
+                ),
+
+<span class="nc" id="L263">                optional(</span>
+<span class="nc" id="L264">                        s(), Truth(truth, tense)</span>
+
+                ),
+
+<span class="nc" id="L268">                push(new Object[]{budget.get(), term.get(), punc.get(), truth.get(), tense.get()})</span>
+                //push(getTask(budget, term, punc, truth, tense))
+
+        );
+    }
+
+
+    Rule Budget(@NotNull Var&lt;float[]&gt; budget) {
+<span class="nc" id="L276">        return sequence(</span>
+<span class="nc" id="L277">                BUDGET_VALUE_MARK,</span>
+
+<span class="nc" id="L279">                ShortFloat(),</span>
+
+<span class="nc" id="L281">                firstOf(</span>
+<span class="nc" id="L282">                        BudgetPriorityDurabilityQuality(budget),</span>
+<span class="nc" id="L283">                        BudgetPriorityDurability(budget),</span>
+<span class="nc" id="L284">                        BudgetPriority(budget)</span>
+                ),
+
+<span class="nc" id="L287">                optional(BUDGET_VALUE_MARK)</span>
+        );
+    }
+
+    boolean BudgetPriority(@NotNull Var&lt;float[]&gt; budget) {
+<span class="fc" id="L292">        return budget.set(new float[]{(float) pop()});</span>
+    }
+
+    Rule BudgetPriorityDurability(@NotNull Var&lt;float[]&gt; budget) {
+<span class="nc" id="L296">        return sequence(</span>
+<span class="nc" id="L297">                VALUE_SEPARATOR, ShortFloat(),</span>
+<span class="nc" id="L298">                budget.set(new float[]{(float) pop(), (float) pop()}) //intermediate representation</span>
+        );
+    }
+
+    Rule BudgetPriorityDurabilityQuality(@NotNull Var&lt;float[]&gt; budget) {
+<span class="nc" id="L303">        return sequence(</span>
+<span class="nc" id="L304">                VALUE_SEPARATOR, ShortFloat(), VALUE_SEPARATOR, ShortFloat(),</span>
+<span class="nc" id="L305">                budget.set(new float[]{(float) pop(), (float) pop(), (float) pop()}) //intermediate representation</span>
+        );
+    }
+
+    Rule Tense(@NotNull Var&lt;Tense&gt; tense) {
+<span class="nc" id="L310">        return firstOf(</span>
+<span class="nc" id="L311">                sequence(TENSE_PRESENT, tense.set(Tense.Present)),</span>
+<span class="nc" id="L312">                sequence(TENSE_PAST, tense.set(Tense.Past)),</span>
+<span class="nc" id="L313">                sequence(TENSE_FUTURE, tense.set(Tense.Future))</span>
+        );
+    }
+
+    Rule Truth(@NotNull Var&lt;Truth&gt; truth, @NotNull Var&lt;Tense&gt; tense) {
+<span class="nc" id="L318">        return sequence(</span>
+
+<span class="nc" id="L320">                TRUTH_VALUE_MARK,</span>
+
+<span class="nc" id="L322">                ShortFloat(), //Frequency</span>
+
+<span class="nc" id="L324">                firstOf(</span>
+
+<span class="nc" id="L326">                        sequence(</span>
+
+<span class="nc" id="L328">                                TruthTenseSeparator(VALUE_SEPARATOR, tense), // separating ;,|,/,\</span>
+
+<span class="nc" id="L330">                                ShortFloat(), //Conf</span>
+
+<span class="nc" id="L332">                                optional(TRUTH_VALUE_MARK), //tailing '%' is optional</span>
+
+<span class="nc bnc" id="L334" title="All 4 branches missed.">                                swap() &amp;&amp; truth.set(new DefaultTruth((float) pop(), (float) pop()))</span>
+                        ),
+
+<span class="nc" id="L337">                        sequence(</span>
+<span class="nc" id="L338">                                TRUTH_VALUE_MARK, //tailing '%'</span>
+
+<span class="nc" id="L340">                                truth.set(new DefaultTruth((float) pop() ))</span>
+                        )
+                )
+        );
+    }
+
+    Rule TruthTenseSeparator(char defaultChar, @NotNull Var&lt;Tense&gt; tense) {
+<span class="nc" id="L347">        return firstOf(</span>
+<span class="nc" id="L348">                defaultChar,</span>
+<span class="nc" id="L349">                sequence('|', tense.set(Tense.Present)),</span>
+<span class="nc" id="L350">                sequence('\\', tense.set(Tense.Past)),</span>
+<span class="nc" id="L351">                sequence('/', tense.set(Tense.Future))</span>
+        );
+    }
+
+
+    Rule ShortFloat() {
+<span class="nc" id="L357">        return sequence(</span>
+<span class="nc" id="L358">                sequence(</span>
+<span class="nc" id="L359">                        optional(digit()),</span>
+<span class="nc" id="L360">                        optional('.', oneOrMore(digit()))</span>
+                ),
+<span class="nc" id="L362">                push(Texts.f(matchOrDefault(&quot;NaN&quot;), 0, 1.0f))</span>
+        );
+    }
+
+
+//    Rule IntegerNonNegative() {
+//        return sequence(
+//                oneOrMore(digit()),
+//                push(Integer.parseInt(matchOrDefault(&quot;NaN&quot;)))
+//        );
+//    }
+
+//    Rule Number() {
+//
+//        return sequence(
+//                sequence(
+//                        optional('-'),
+//                        oneOrMore(digit()),
+//                        optional('.', oneOrMore(digit()))
+//                ),
+//                push(Float.parseFloat(matchOrDefault(&quot;NaN&quot;)))
+//        );
+//    }
+
+    Rule SentencePunctuation(@NotNull Var&lt;Character&gt; punc) {
+<span class="nc" id="L387">        return sequence(anyOf(&quot;.?!@;&quot;), punc.set(matchedChar()));</span>
+    }
+
+
+    public Rule Term() {
+<span class="fc" id="L392">        return Term(true, true);</span>
+    }
+
+//    Rule nothing() {
+//        return new NothingMatcher();
+//    }
+
+
+    @Cached
+    Rule Term(boolean oper, boolean meta) {
+        /*
+                 &lt;term&gt; ::= &lt;word&gt;                             // an atomic constant term
+                        | &lt;variable&gt;                         // an atomic variable term
+                        | &lt;compound-term&gt;                    // a term with internal structure
+                        | &lt;statement&gt;                        // a statement can serve as a term
+        */
+
+<span class="nc" id="L409">        return seq(</span>
+<span class="nc" id="L410">                s(),</span>
+<span class="nc" id="L411">                firstOf(</span>
+<span class="nc" id="L412">                        QuotedMultilineLiteral(),</span>
+<span class="nc" id="L413">                        QuotedLiteral(),</span>
+
+<span class="nc" id="L415">                        Operator(),</span>
+
+<span class="nc" id="L417">                        seq(meta, Ellipsis()),</span>
+
+<span class="nc" id="L419">                        seq(meta, TaskRule()),</span>
+
+<span class="nc" id="L421">                        seq(oper, ColonReverseInheritance()),</span>
+
+<span class="nc" id="L423">                        TemporalRelation(),</span>
+
+                        //Functional form of an Operation, ex: operate(p1,p2), TODO move to FunctionalOperationTerm() rule
+<span class="nc" id="L426">                        seq(oper,</span>
+
+<span class="nc" id="L428">                                Term(false, false),</span>
+
+<span class="nc" id="L430">                                COMPOUND_TERM_OPENER,</span>
+
+<span class="nc" id="L432">                                firstOf(</span>
+
+                                        //empty operator parens
+<span class="nc" id="L435">                                        sequence(s(), COMPOUND_TERM_CLOSER, push(popTerm(Op.OPERATOR, false))),</span>
+
+<span class="nc" id="L437">                                        MultiArgTerm(Op.OPERATOR, COMPOUND_TERM_CLOSER, false, false, false, true)</span>
+                                )
+                        ),
+
+<span class="nc" id="L441">                        seq(STATEMENT_OPENER,</span>
+<span class="nc" id="L442">                                MultiArgTerm(null, STATEMENT_CLOSER, false, true, true, false)</span>
+                        ),
+
+
+<span class="nc" id="L446">                        Variable(),</span>
+
+//                        //negation shorthand
+<span class="nc" id="L449">                        seq(Op.NEGATE.str, s(), Term(), push(</span>
+                                //Negation.make(popTerm(null, true)))),
+<span class="nc" id="L451">                                $.neg(Atom.the(pop())))),</span>
+
+<span class="nc" id="L453">                        seq(</span>
+                                Op.SET_EXT_OPENER.str,
+<span class="nc" id="L455">                                MultiArgTerm(Op.SET_EXT_OPENER, SET_EXT_CLOSER)</span>
+                        ),
+
+<span class="nc" id="L458">                        seq(</span>
+                                Op.SET_INT_OPENER.str,
+<span class="nc" id="L460">                                MultiArgTerm(Op.SET_INT_OPENER, SET_INT_CLOSER)</span>
+                        ),
+
+<span class="nc" id="L463">                        seq(COMPOUND_TERM_OPENER,</span>
+<span class="nc" id="L464">                                firstOf(</span>
+                                        //empty product
+<span class="nc" id="L466">                                        seq(s(), COMPOUND_TERM_CLOSER, push(TermIndex.Empty)),</span>
+
+<span class="nc" id="L468">                                        MultiArgTerm(null, COMPOUND_TERM_CLOSER, true, false, false, false),</span>
+
+                                        //default to product if no operator specified in ( )
+<span class="nc" id="L471">                                        MultiArgTerm(Op.PRODUCT, COMPOUND_TERM_CLOSER, false, false, false, false),</span>
+
+<span class="nc" id="L473">                                        MultiArgTerm(null, COMPOUND_TERM_CLOSER, false, true, true, false)</span>
+                                )
+                        ),
+
+<span class="nc" id="L477">                        NumberAtom(),</span>
+<span class="nc" id="L478">                        Atom()</span>
+
+                ),
+
+<span class="nc" id="L482">                push(the(pop())),</span>
+
+<span class="nc" id="L484">                s()</span>
+        );
+    }
+
+    public Rule seq(@NotNull Object rule, @NotNull Object rule2,
+                    Object... moreRules) {
+<span class="fc" id="L490">        return sequence(rule, rule2, moreRules);</span>
+    }
+
+
+//    Rule EmptyProduct() {
+//        return sequence(
+//            COMPOUND_TERM_OPENER, s(), COMPOUND_TERM_CLOSER, push(Compounds.Empty)
+//        );
+//    }
+
+
+    public Rule TemporalRelation() {
+<span class="nc" id="L502">        return seq(</span>
+
+<span class="nc" id="L504">                COMPOUND_TERM_OPENER,</span>
+<span class="nc" id="L505">                s(),</span>
+<span class="nc" id="L506">                Term(true,false),</span>
+<span class="nc" id="L507">                s(),</span>
+<span class="nc" id="L508">                OpTemporal(),</span>
+<span class="nc" id="L509">                CycleDelta(),</span>
+<span class="nc" id="L510">                s(),</span>
+<span class="nc" id="L511">                Term(true,false),</span>
+<span class="nc" id="L512">                s(),</span>
+<span class="nc" id="L513">                COMPOUND_TERM_CLOSER,</span>
+
+
+<span class="nc" id="L516">                push(TemporalRelationBuilder((Term) pop() /* pred */,</span>
+<span class="nc" id="L517">                        (Integer) pop() /*cycleDelta*/, (Op) pop() /*relation*/, (Term) pop() /* subj */))</span>
+        );
+    }
+
+    @Nullable
+    public static Term TemporalRelationBuilder(Term pred, int cycles, @NotNull Op o, Term subj) {
+<span class="fc" id="L523">        return $.the(o, -1, cycles, new TermVector(subj, pred));</span>
+    }
+
+<span class="fc" id="L526">    public final static String invalidCycleDeltaString = Integer.toString(Integer.MIN_VALUE);</span>
+
+    public Rule CycleDelta() {
+<span class="nc" id="L529">        return</span>
+<span class="nc" id="L530">                firstOf(</span>
+<span class="nc" id="L531">                    seq('+',oneOrMore(digit()),</span>
+<span class="nc" id="L532">                        push(Integer.parseInt(matchOrDefault(invalidCycleDeltaString)))</span>
+                    ),
+<span class="nc" id="L534">                    seq('-',oneOrMore(digit()),</span>
+<span class="nc" id="L535">                        push(-Integer.parseInt(matchOrDefault(invalidCycleDeltaString)))</span>
+                    )
+                )
+        ;
+    }
+
+    public Rule Operator() {
+<span class="nc" id="L542">        return sequence(OPERATOR.ch, Term(false, false),</span>
+<span class="nc" id="L543">                push(new Operator((Term) pop())));</span>
+    }
+
+    //final static String invalidAtomCharacters = &quot; ,.!?&quot; + INTERVAL_PREFIX_OLD + &quot;&lt;&gt;-=*|&amp;()&lt;&gt;[]{}%#$@\'\&quot;\t\n&quot;;
+
+    /**
+     * an atomic term, returns a String because the result may be used as a Variable name
+     */
+    Rule Atom() {
+<span class="nc" id="L552">        return sequence(</span>
+                ValidAtomCharMatcher.the,
+<span class="nc" id="L554">                push(match())</span>
+        );
+    }
+
+    Rule NumberAtom() {
+<span class="nc" id="L559">        return sequence(</span>
+<span class="nc" id="L560">                sequence(</span>
+<span class="nc" id="L561">                        optional('-'),</span>
+<span class="nc" id="L562">                        oneOrMore(digit()),</span>
+<span class="nc" id="L563">                        optional('.', oneOrMore(digit()))</span>
+                ),
+<span class="nc" id="L565">                push(Atom.the(Float.parseFloat(matchOrDefault(&quot;NaN&quot;))))</span>
+        );
+    }
+
+
+    public static final class ValidAtomCharMatcher extends AbstractMatcher {
+
+<span class="fc" id="L572">        public static final ValidAtomCharMatcher the = new ValidAtomCharMatcher();</span>
+
+        protected ValidAtomCharMatcher() {
+<span class="fc" id="L575">            super(&quot;'ValidAtomChar'&quot;);</span>
+<span class="fc" id="L576">        }</span>
+
+        @NotNull
+        @Override
+        public MatcherType getType() {
+<span class="nc" id="L581">            return MatcherType.TERMINAL;</span>
+        }
+
+        @Override
+        public &lt;V&gt; boolean match(@NotNull MatcherContext&lt;V&gt; context) {
+<span class="fc" id="L586">            int count = 0;</span>
+<span class="fc" id="L587">            int max = context.getInputBuffer().length() - context.getCurrentIndex();</span>
+
+<span class="fc bfc" id="L589" title="All 4 branches covered.">            while (count &lt; max &amp;&amp; isValidAtomChar(context.getCurrentChar())) {</span>
+<span class="fc" id="L590">                context.advanceIndex(1);</span>
+<span class="fc" id="L591">                count++;</span>
+            }
+
+<span class="fc bfc" id="L594" title="All 2 branches covered.">            return count &gt; 0;</span>
+        }
+    }
+
+    public static boolean isValidAtomChar(char c) {
+<span class="fc" id="L599">        int x = (int) c;</span>
+
+        //TODO replace these with Symbols. constants
+<span class="fc bfc" id="L602" title="All 2 branches covered.">        switch (x) {</span>
+            case ' ':
+            case Symbols.ARGUMENT_SEPARATOR:
+            case Symbols.JUDGMENT:
+            case Symbols.GOAL:
+            case Symbols.QUESTION:
+            case Symbols.QUEST:
+            case '\&quot;':
+            case '^':
+            case '&lt;':
+            case '&gt;':
+
+            case '~':
+            case '=':
+
+            case '+':
+            case '-':
+            case '*':
+
+            case '|':
+            case '&amp;':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '%':
+            case '#':
+            case '$':
+            case ':':
+            case '`':
+            case '\'':
+            case '\t':
+            case '\n':
+<span class="fc" id="L637">                return false;</span>
+        }
+<span class="fc" id="L639">        return true;</span>
+    }
+
+
+    /**
+     * MACRO: y:x    becomes    &lt;x --&gt; y&gt;
+     */
+    Rule ColonReverseInheritance() {
+<span class="nc" id="L647">        return sequence(</span>
+<span class="nc" id="L648">                Term(false, true), s(), ':', s(), Term(),</span>
+<span class="nc" id="L649">                push($.inh((Term) pop(), (Term) pop()))</span>
+        );
+    }
+
+//    /**
+//     * MACRO: y`x    becomes    &lt;{x} --&gt; y&gt;
+//     */
+//    Rule BacktickReverseInstance() {
+//        return sequence(
+//                Atom(), s(), '`', s(), Term(false),
+//                push(Instance.make((Term)(pop()), Atom.the(pop())))
+//        );
+//    }
+//
+
+//    /** creates a parser that is not associated with a memory; it will not parse any operator terms (which are registered with a Memory instance) */
+//    public static NarseseParser newParser() {
+//        return newParser((Memory)null);
+//    }
+//
+//    public static NarseseParser newMetaParser() {
+//        return newParser((Memory)null);
+//    }
+
+
+    Rule QuotedLiteral() {
+<span class="nc" id="L675">        return sequence(dquote(), AnyString(), push('\&quot;' + match() + '\&quot;'), dquote());</span>
+    }
+
+    Rule QuotedMultilineLiteral() {
+<span class="nc" id="L679">        return sequence(</span>
+<span class="nc" id="L680">                TripleQuote(), //dquote(), dquote(), dquote()),</span>
+<span class="nc" id="L681">                AnyString(), push('\&quot;' + match() + '\&quot;'),</span>
+<span class="nc" id="L682">                TripleQuote() //dquote(), dquote(), dquote()</span>
+        );
+    }
+
+    Rule TripleQuote() {
+<span class="fc" id="L687">        return string(&quot;\&quot;\&quot;\&quot;&quot;);</span>
+    }
+
+    Rule Ellipsis() {
+<span class="nc" id="L691">        return sequence(</span>
+<span class="nc" id="L692">                Variable(), &quot;..&quot;,</span>
+<span class="nc" id="L693">                firstOf(</span>
+
+<span class="nc" id="L695">                        seq(Term(false, false), &quot;=&quot;, Term(false, false), &quot;..+&quot;,</span>
+<span class="nc" id="L696">                                swap(3),</span>
+<span class="nc" id="L697">                                push(new EllipsisTransform(</span>
+<span class="nc" id="L698">                                        (Variable) pop(), (Term) pop(), (Term) pop()))</span>
+                        ),
+<span class="nc" id="L700">                        seq(&quot;+&quot;,</span>
+<span class="nc" id="L701">                                push(new EllipsisOneOrMore((Variable) pop()))</span>
+                        ),
+<span class="nc" id="L703">                        seq(&quot;*&quot;,</span>
+<span class="nc" id="L704">                                push(new EllipsisZeroOrMore((Variable) pop()))</span>
+                        )
+                )
+        );
+    }
+
+    Rule AnyString() {
+        //TODO handle \&quot; escape
+<span class="fc" id="L712">        return oneOrMore(noneOf(&quot;\&quot;&quot;));</span>
+    }
+
+//    Rule AnyAlphas() {
+//        //TODO handle \&quot; escape
+//        return sequence( alpha(), push(matchedChar()), zeroOrMore( alphanumeric() ), push(match()),
+//                swap(),
+//                push( pop().toString() + pop().toString()));
+//    }
+
+    //Rule alphanumeric() { return firstOf(alpha(), digit()); }
+
+
+//    @Deprecated Rule IntervalLog() {
+//        return sequence(INTERVAL_PREFIX_OLD, sequence(oneOrMore(digit()), push(match()),
+//                //push(Interval.interval(-1 + Texts.i((String) pop())))
+//                push(CyclesInterval.intervalLog(-1 + Texts.i((String) pop())))
+//        ));
+//    }
+
+
+    Rule Variable() {
+        /*
+           &lt;variable&gt; ::= &quot;$&quot;&lt;word&gt;                          // independent variable
+                        | &quot;#&quot;[&lt;word&gt;]                        // dependent variable
+                        | &quot;?&quot;[&lt;word&gt;]                        // query variable in question
+                        | &quot;%&quot;[&lt;word&gt;]                        // pattern variable in rule
+        */
+<span class="nc" id="L740">        return firstOf(</span>
+<span class="nc" id="L741">                sequence(Symbols.VAR_INDEPENDENT, Atom(), push(new Variable.VarIndep((String) pop()))),</span>
+<span class="nc" id="L742">                sequence(Symbols.VAR_DEPENDENT, Atom(), push(new Variable.VarDep((String) pop()))),</span>
+<span class="nc" id="L743">                sequence(Symbols.VAR_QUERY, Atom(), push(new Variable.VarQuery((String) pop()))),</span>
+<span class="nc" id="L744">                sequence(Symbols.VAR_PATTERN, Atom(), push(new VarPattern((String) pop())))</span>
+//                anyOf(variables),
+//                push(match().charAt(0)), Atom(), swap(),
+//                    push($.v((char)pop(), (String) pop())
+//                )
+        );
+    }
+
+    //Rule CompoundTerm() {
+        /*
+         &lt;compound-term&gt; ::= &quot;{&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;}&quot;         // extensional set
+                        | &quot;[&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;]&quot;         // intensional set
+                        | &quot;(&amp;,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;       // extensional intersection
+                        | &quot;(|,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;       // intensional intersection
+                        | &quot;(*,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;       // product
+                        | &quot;(/,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;       // extensional image
+                        | &quot;(\,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;       // intensional image
+                        | &quot;(||,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;      // disjunction
+                        | &quot;(&amp;&amp;,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;      // conjunction
+                        | &quot;(&amp;/,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;      // (sequential events)
+                        | &quot;(&amp;|,&quot; &lt;term&gt; {&quot;,&quot;&lt;term&gt;} &quot;)&quot;      // (parallel events)
+                        | &quot;(--,&quot; &lt;term&gt; &quot;)&quot;                  // negation
+                        | &quot;(-,&quot; &lt;term&gt; &quot;,&quot; &lt;term&gt; &quot;)&quot;        // extensional difference
+                        | &quot;(~,&quot; &lt;term&gt; &quot;,&quot; &lt;term&gt; &quot;)&quot;        // intensional difference
+        
+        */
+
+    //}
+
+    Rule Op() {
+<span class="nc" id="L774">        return sequence(</span>
+<span class="nc" id="L775">                trie(</span>
+                        INTERSECT_EXT.str, INTERSECT_INT.str,
+                        DIFF_EXT.str, DIFF_INT.str,
+                        PRODUCT.str,
+                        IMAGE_EXT.str, IMAGE_INT.str,
+
+                        INHERIT.str,
+
+                        SIMILAR.str,
+
+                        PROPERTY.str,
+                        INSTANCE.str,
+                        INSTANCE_PROPERTY.str,
+
+                        NEGATE.str,
+
+                        IMPLICATION.str,
+
+                        EQUIV.str,
+
+                        DISJUNCTION.str,
+                        CONJUNCTION.str
+                ),
+
+<span class="nc" id="L799">                push(getOperator(match()))</span>
+        );
+    }
+
+    Rule OpTemporal() {
+<span class="nc" id="L804">        return sequence(</span>
+<span class="nc" id="L805">                trie(</span>
+                        IMPLICATION.str,
+                        EQUIV.str,
+                        CONJUNCTION.str
+                ),
+<span class="nc" id="L810">                push(getOperator(match()))</span>
+        );
+    }
+
+    Rule sepArgSep() {
+<span class="fc" id="L815">        return sequence(s(), ARGUMENT_SEPARATOR, s());</span>
+    }
+
+    Rule sepArg() {
+<span class="fc" id="L819">        return sequence(s(), ARGUMENT_SEPARATOR);</span>
+
+        /*
+        return firstOf(
+                //check the ' , ' comma separated first, it is more complex
+                sequence(s(), String.valueOf(Symbols.ARGUMENT_SEPARATOR), s()),
+
+
+                //then allow plain whitespace to function as a term separator?
+                s()
+        );*/
+    }
+
+    @Cached
+    Rule MultiArgTerm(Op open, char close) {
+<span class="fc" id="L834">        return MultiArgTerm(open, /*open, */close, false, false, false, false);</span>
+    }
+
+    boolean OperationPrefixTerm() {
+<span class="fc" id="L838">        return push(new Object[]{termable(pop()), (Operator.class)});</span>
+    }
+
+    /**
+     * list of terms prefixed by a particular compound term operate
+     */
+    @Cached
+    Rule MultiArgTerm(Op defaultOp, char close, boolean initialOp, boolean allowInternalOp, @Deprecated boolean spaceSeparates, boolean operatorPrecedes) {
+
+
+<span class="nc bnc" id="L848" title="All 2 branches missed.">        return sequence(</span>
+
+<span class="nc bnc" id="L850" title="All 2 branches missed.">                operatorPrecedes ? OperationPrefixTerm() : push(Compound.class),</span>
+
+<span class="nc bnc" id="L852" title="All 2 branches missed.">                initialOp ? Op() : Term(),</span>
+
+                spaceSeparates ?
+
+<span class="nc" id="L856">                        sequence(s(), Op(), s(), Term())</span>
+
+                        :
+
+<span class="nc" id="L860">                        zeroOrMore(sequence(</span>
+<span class="nc bnc" id="L861" title="All 2 branches missed.">                                sepArg(),</span>
+<span class="nc" id="L862">                                allowInternalOp ? AnyOperatorOrTerm() : Term()</span>
+                        )),
+
+<span class="nc" id="L865">                sequence(s(), close),</span>
+
+<span class="nc" id="L867">                push(popTerm(defaultOp, allowInternalOp))</span>
+        );
+    }
+
+    /**
+     * operation()
+     */
+    Rule EmptyOperationParens() {
+<span class="nc" id="L875">        return sequence(</span>
+
+<span class="nc" id="L877">                OperationPrefixTerm(),</span>
+
+<span class="nc" id="L879">                /*s(),*/ COMPOUND_TERM_OPENER, s(), COMPOUND_TERM_CLOSER,</span>
+
+<span class="nc" id="L881">                push(popTerm(Op.OPERATOR, false))</span>
+        );
+    }
+
+    Rule AnyOperatorOrTerm() {
+<span class="nc" id="L886">        return firstOf(Op(), Term());</span>
+    }
+
+
+    /**
+     * pass-through; the object is potentially a term but don't create it yet
+     */
+    static Object termable(Object o) {
+<span class="fc" id="L894">        return o;</span>
+    }
+
+    @Nullable
+    static Object the(@Nullable Object o) {
+<span class="fc bfc" id="L899" title="All 2 branches covered.">        if (o == null) return null; //pass through</span>
+<span class="fc bfc" id="L900" title="All 2 branches covered.">        if (o instanceof Term) return o;</span>
+<span class="pc bpc" id="L901" title="1 of 2 branches missed.">        if (o instanceof String) {</span>
+<span class="fc" id="L902">            String s = (String) o;</span>
+<span class="fc" id="L903">            return Atom.the(s);</span>
+        }
+<span class="nc" id="L905">        throw new RuntimeException(o + &quot; is not a term&quot;);</span>
+    }
+
+    /**
+     * produce a term from the terms (&amp; &lt;=1 NALOperator's) on the value stack
+     */
+    @Deprecated
+    final Term popTerm(Op op /*default */, @Deprecated boolean allowInternalOp) {
+
+
+        //System.err.println(getContext().getValueStack());
+
+<span class="fc" id="L917">        ValueStack&lt;Object&gt; stack = getContext().getValueStack();</span>
+
+
+<span class="fc" id="L920">        List&lt;Term&gt; vectorterms = Global.newArrayList(2); //stack.size() + 1);</span>
+
+<span class="fc bfc" id="L922" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L923">            Object p = pop();</span>
+
+<span class="fc bfc" id="L925" title="All 2 branches covered.">            if (p instanceof Object[]) {</span>
+                //it's an array so unpack by pushing everything back onto the stack except the last item which will be used as normal below
+<span class="fc" id="L927">                Object[] pp = (Object[]) p;</span>
+<span class="pc bpc" id="L928" title="1 of 2 branches missed.">                if (pp.length &gt; 1) {</span>
+<span class="fc bfc" id="L929" title="All 2 branches covered.">                    for (int i = pp.length - 1; i &gt;= 1; i--) {</span>
+<span class="fc" id="L930">                        stack.push(pp[i]);</span>
+                    }
+                }
+
+<span class="fc" id="L934">                p = pp[0];</span>
+            }
+
+<span class="fc bfc" id="L937" title="All 2 branches covered.">            if (p == Operator.class) {</span>
+<span class="fc" id="L938">                op = OPERATOR;</span>
+<span class="fc" id="L939">                break;</span>
+            }
+
+<span class="fc bfc" id="L942" title="All 2 branches covered.">            if (p == Compound.class) break; //beginning of stack frame for this term</span>
+
+
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">            if (p instanceof String) {</span>
+<span class="nc" id="L946">                throw new RuntimeException(&quot;string not expected here&quot;);</span>
+//                Term t = Atom.the((String) p);
+//                vectorterms.add(t);
+<span class="fc bfc" id="L949" title="All 2 branches covered.">            } else if (p instanceof Term) {</span>
+<span class="fc" id="L950">                Term t = (Term) p;</span>
+<span class="fc" id="L951">                vectorterms.add(t);</span>
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">            } else if (p instanceof Op) {</span>
+
+<span class="pc bpc" id="L954" title="1 of 2 branches missed.">                if (op != null) {</span>
+<span class="nc bnc" id="L955" title="All 4 branches missed.">                    if ((!allowInternalOp) &amp;&amp; (!p.equals(op)))</span>
+<span class="nc" id="L956">                        throw new RuntimeException(&quot;Internal operator &quot; + p + &quot; not allowed here; default op=&quot; + op);</span>
+
+<span class="nc" id="L958">                    throw new NarseseException(&quot;Too many operators involved: &quot; + op + ',' + p + &quot; in &quot; + stack + ':' + vectorterms);</span>
+                }
+
+<span class="fc" id="L961">                op = (Op) p;</span>
+            }
+<span class="fc" id="L963">        }</span>
+
+
+<span class="pc bpc" id="L966" title="1 of 2 branches missed.">        if (vectorterms.isEmpty()) return null;</span>
+
+        //int v = vectorterms.size();
+
+<span class="fc" id="L970">        Collections.reverse(vectorterms);</span>
+
+//        if ((op == null || op == PRODUCT) &amp;&amp; (vectorterms.get(0) instanceof Operator)) {
+//            op = NALOperator.OPERATION;
+//        }
+
+
+<span class="fc bfc" id="L977" title="All 2 branches covered.">        return (op == OPERATOR) ?</span>
+<span class="fc" id="L978">                $.oper(new Operator(vectorterms.get(0)),</span>
+<span class="fc" id="L979">                        $.p(vectorterms, 1, vectorterms.size())</span>
+                ) :
+<span class="fc" id="L981">                $.the(op, -1, vectorterms);</span>
+    }
+
+
+    /**
+     * whitespace, optional
+     */
+    Rule s() {
+<span class="fc" id="L989">        return zeroOrMore(anyOf(&quot; \t\f\n\r&quot;));</span>
+    }
+
+//    Rule sNonNewLine() {
+//        return zeroOrMore(anyOf(&quot; \t\f&quot;));
+//    }
+
+//    public static NarseseParser newParser(NAR n) {
+//        return newParser(n.memory);
+//    }
+//
+//    public static NarseseParser newParser(Memory m) {
+//        NarseseParser np = ;
+//        return np;
+//    }
+
+
+    /**
+     * returns number of tasks created
+     */
+    public static int tasks(String input, @NotNull Collection&lt;Task&gt; c, @NotNull Memory m) {
+<span class="fc" id="L1010">        int[] i = new int[1];</span>
+<span class="fc" id="L1011">        tasks(input, t -&gt; {</span>
+<span class="fc" id="L1012">            c.add(t);</span>
+<span class="fc" id="L1013">            i[0]++;</span>
+<span class="fc" id="L1014">        }, m);</span>
+<span class="fc" id="L1015">        return i[0];</span>
+    }
+
+    /**
+     * gets a stream of raw immutable task-generating objects
+     * which can be re-used because a Memory can generate them
+     * ondemand
+     */
+    public static void tasks(String input, @NotNull Consumer&lt;Task&gt; c, @NotNull Memory m) {
+<span class="fc" id="L1024">        tasksRaw(input, o -&gt; {</span>
+<span class="fc" id="L1025">            Task t = decodeTask(m, o);</span>
+<span class="pc bpc" id="L1026" title="1 of 2 branches missed.">            if (t == null) {</span>
+<span class="nc" id="L1027">                m.eventError.emit(&quot;Invalid task: &quot; + input);</span>
+            } else {
+<span class="fc" id="L1029">                c.accept(t);</span>
+            }
+<span class="fc" id="L1031">        });</span>
+<span class="fc" id="L1032">    }</span>
+
+
+    /**
+     * supplies the source array of objects that can construct a Task
+     */
+    public static void tasksRaw(CharSequence input, @NotNull Consumer&lt;Object[]&gt; c) {
+
+<span class="fc" id="L1040">        ParsingResult r = the().inputParser.run(input);</span>
+
+<span class="fc" id="L1042">        int size = r.getValueStack().size();</span>
+
+<span class="fc bfc" id="L1044" title="All 2 branches covered.">        for (int i = size - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L1045">            Object o = r.getValueStack().peek(i);</span>
+
+<span class="fc bfc" id="L1047" title="All 2 branches covered.">            if (o instanceof Task) {</span>
+                //wrap the task in an array
+<span class="fc" id="L1049">                c.accept(new Object[]{o});</span>
+<span class="pc bpc" id="L1050" title="1 of 2 branches missed.">            } else if (o instanceof Object[]) {</span>
+<span class="fc" id="L1051">                c.accept((Object[]) o);</span>
+            } else {
+<span class="nc" id="L1053">                throw new RuntimeException(&quot;Unrecognized input result: &quot; + o);</span>
+            }
+        }
+<span class="fc" id="L1056">    }</span>
+
+
+    //r.getValueStack().clear();
+
+//        r.getValueStack().iterator().forEachRemaining(x -&gt; {
+//            if (x instanceof Task)
+//                c.accept((Task) x);
+//            else {
+//                throw new RuntimeException(&quot;Unknown parse result: &quot; + x + &quot; (&quot; + x.getClass() + ')');
+//            }
+//        });
+
+
+    /**
+     * parse one task
+     */
+    @Nullable
+    public Task task(String input, @NotNull Memory memory) throws NarseseException {
+        ParsingResult r;
+        try {
+<span class="fc" id="L1077">            r = singleTaskParser.run(input);</span>
+<span class="nc" id="L1078">        } catch (Throwable ge) {</span>
+            //ge.printStackTrace();
+<span class="nc" id="L1080">            throw new NarseseException(ge.toString() + ' ' + ge.getCause() + &quot;: parsing: &quot; + input);</span>
+<span class="fc" id="L1081">        }</span>
+
+<span class="pc bpc" id="L1083" title="1 of 2 branches missed.">        if (r == null)</span>
+<span class="nc" id="L1084">            throw new NarseseException(&quot;null parse: &quot; + input);</span>
+
+
+        try {
+<span class="fc" id="L1088">            return decodeTask(memory, (Object[]) r.getValueStack().peek());</span>
+<span class="fc" id="L1089">        } catch (Exception e) {</span>
+<span class="fc" id="L1090">            throw newParseException(input, r, e);</span>
+        }
+    }
+
+    /**
+     * returns null if the Task is invalid (ex: invalid term)
+     */
+    @Nullable
+    public static Task decodeTask(@NotNull Memory m, @NotNull Object[] x) {
+<span class="pc bpc" id="L1099" title="1 of 4 branches missed.">        if (x.length == 1 &amp;&amp; x[0] instanceof Task) {</span>
+<span class="fc" id="L1100">            return (Task) x[0];</span>
+        }
+<span class="fc" id="L1102">        Term contentRaw = (Term) x[1];</span>
+<span class="fc" id="L1103">        Termed content = m.index.normalized(contentRaw);</span>
+<span class="pc bpc" id="L1104" title="1 of 2 branches missed.">        if (content == null)</span>
+<span class="nc" id="L1105">            throw new RuntimeException(&quot;Task term unnormalizable: &quot; + contentRaw);</span>
+
+<span class="fc" id="L1107">        char punct = (Character) x[2];</span>
+
+<span class="fc" id="L1109">        Truth t = (Truth) x[3];</span>
+<span class="fc bfc" id="L1110" title="All 4 branches covered.">        if (t!=null &amp;&amp; !Float.isFinite(t.getConfidence()))</span>
+<span class="fc" id="L1111">            t.setConfidence(m.getDefaultConfidence(punct));</span>
+
+<span class="fc" id="L1113">        return makeTask(m, (float[]) x[0], content, punct, t, (Tense) x[4]);</span>
+    }
+
+    /**
+     * parse one term unnormalized
+     */
+    @Nullable
+    public Term term(CharSequence s) {
+
+<span class="fc" id="L1122">        ParsingResult r = singleTermParser.run(s);</span>
+
+<span class="fc" id="L1124">        DefaultValueStack stack = (DefaultValueStack) r.getValueStack();</span>
+<span class="fc" id="L1125">        FasterList sstack = stack.stack;</span>
+
+<span class="pc bpc" id="L1127" title="2 of 3 branches missed.">        switch (sstack.size()) {</span>
+            case 1:
+
+
+<span class="fc" id="L1131">                Object x = sstack.get(0);</span>
+
+<span class="pc bpc" id="L1133" title="1 of 2 branches missed.">                if (x instanceof String)</span>
+<span class="nc" id="L1134">                    x = $.$((String) x);</span>
+
+<span class="fc bfc" id="L1136" title="All 2 branches covered.">                if (x != null) {</span>
+
+                    try {
+<span class="fc" id="L1139">                        return (Term) x;</span>
+<span class="nc" id="L1140">                    } catch (ClassCastException cce) {</span>
+<span class="nc" id="L1141">                        throw new NarseseException(&quot;Term mismatch: &quot; + x.getClass(), cce);</span>
+                    }
+                }
+                break;
+            case 0:
+<span class="nc" id="L1146">                return null;</span>
+            default:
+<span class="nc" id="L1148">                throw new RuntimeException(&quot;Invalid parse stack: &quot; + sstack);</span>
+        }
+
+<span class="fc" id="L1151">        return null;</span>
+    }
+
+    @Nullable
+    public Termed term(String s, @NotNull TermBuilder t) {
+<span class="fc" id="L1156">        return term(s, t, true);</span>
+    }
+
+    @Nullable
+    public Termed term(String s, @NotNull TermBuilder index, boolean normalize) {
+<span class="fc" id="L1161">        Term raw = term(s);</span>
+<span class="fc bfc" id="L1162" title="All 2 branches covered.">        if (raw == null) return null;</span>
+
+<span class="fc bfc" id="L1164" title="All 4 branches covered.">        return (normalize &amp;&amp; !raw.isNormalized()) ?</span>
+<span class="fc" id="L1165">                index.normalized(raw) : index.the(raw);</span>
+    }
+
+    @Nullable
+    public Termed concept(String s, @NotNull Memory m) {
+<span class="nc" id="L1170">        return m.concept(term(s));</span>
+    }
+
+//    public TaskRule taskRule(String input) {
+//        Term x = termRaw(input, singleTaskRuleParser);
+//        if (x==null) return null;
+//
+//        return x.normalizeDestructively();
+//    }
+
+
+    @Nullable
+    public &lt;T extends Term&gt; T termRaw(CharSequence input) throws NarseseException {
+
+<span class="fc" id="L1184">        ParsingResult r = singleTermParser.run(input);</span>
+
+<span class="fc" id="L1186">        DefaultValueStack stack = (DefaultValueStack) r.getValueStack();</span>
+<span class="fc" id="L1187">        FasterList sstack = stack.stack;</span>
+
+<span class="pc bpc" id="L1189" title="1 of 3 branches missed.">        switch (sstack.size()) {</span>
+            case 1:
+
+
+<span class="fc" id="L1193">                Object x = sstack.get(0);</span>
+
+<span class="pc bpc" id="L1195" title="1 of 2 branches missed.">                if (x instanceof String)</span>
+<span class="nc" id="L1196">                    x = $.$((String) x);</span>
+
+<span class="pc bpc" id="L1198" title="1 of 2 branches missed.">                if (x != null) {</span>
+
+                    try {
+<span class="fc" id="L1201">                        return (T) x;</span>
+<span class="nc" id="L1202">                    } catch (ClassCastException cce) {</span>
+<span class="nc" id="L1203">                        throw new NarseseException(&quot;Term mismatch: &quot; + x.getClass(), cce);</span>
+                    }
+                }
+                break;
+            case 0:
+<span class="fc" id="L1208">                return null;</span>
+            default:
+<span class="nc" id="L1210">                throw new RuntimeException(&quot;Invalid parse stack: &quot; + sstack);</span>
+        }
+
+<span class="nc" id="L1213">        return null;</span>
+    }
+
+
+    @NotNull
+    public static NarseseException newParseException(String input, ParsingResult r, @Nullable Exception e) {
+
+        //CharSequenceInputBuffer ib = (CharSequenceInputBuffer) r.getInputBuffer();
+
+
+        //if (!r.isSuccess()) {
+<span class="pc bpc" id="L1224" title="1 of 2 branches missed.">        return new NarseseException(&quot;input: &quot; + input + &quot; (&quot; + r + &quot;)  &quot; +</span>
+<span class="pc" id="L1225">                (e != null ? e.toString() + ' ' + Arrays.toString(e.getStackTrace()) : &quot;&quot;));</span>
+
+        //}
+//        if (r.parseErrors.isEmpty())
+//            return new InvalidInputException(&quot;No parse result for: &quot; + input);
+//
+//        String all = &quot;\n&quot;;
+//        for (Object o : r.getParseErrors()) {
+//            ParseError pe = (ParseError)o;
+//            all += pe.getClass().getSimpleName() + &quot;: &quot; + pe.getErrorMessage() + &quot; @ &quot; + pe.getStartIndex() + &quot;\n&quot;;
+//        }
+//        return new InvalidInputException(all + &quot; for input: &quot; + input);
+    }
+
+
+//    /**
+//     * interactive parse test
+//     */
+//    public static void main(String[] args) {
+//        NAR n = new NAR(new Default());
+//        NarseseParser p = NarseseParser.newParser(n);
+//
+//        Scanner sc = new Scanner(System.in);
+//
+//        String input = null; //&quot;&lt;a ==&gt; b&gt;. %0.00;0.9%&quot;;
+//
+//        while (true) {
+//            if (input == null)
+//                input = sc.nextLine();
+//
+//            ParseRunner rpr = new ListeningParseRunner&lt;&gt;(p.Input());
+//            //TracingParseRunner rpr = new TracingParseRunner(p.Input());
+//
+//            ParsingResult r = rpr.run(input);
+//
+//            //p.printDebugResultInfo(r);
+//            input = null;
+//        }
+//
+//    }
+
+//    public void printDebugResultInfo(ParsingResult r) {
+//
+//        System.out.println(&quot;valid? &quot; + (r.isSuccess() &amp;&amp; (r.getParseErrors().isEmpty())));
+//        r.getValueStack().iterator().forEachRemaining(x -&gt; System.out.println(&quot;  &quot; + x.getClass() + ' ' + x));
+//
+//        for (Object e : r.getParseErrors()) {
+//            if (e instanceof InvalidInputError) {
+//                InvalidInputError iie = (InvalidInputError) e;
+//                System.err.println(e);
+//                if (iie.getErrorMessage() != null)
+//                    System.err.println(iie.getErrorMessage());
+//                for (MatcherPath m : iie.getFailedMatchers()) {
+//                    System.err.println(&quot;  ?-&gt; &quot; + m);
+//                }
+//                System.err.println(&quot; at: &quot; + iie.getStartIndex() + &quot; to &quot; + iie.getEndIndex());
+//            } else {
+//                System.err.println(e);
+//            }
+//
+//        }
+//
+//        System.out.println(printNodeTree(r));
+//
+//    }
+
+
+    /**
+     * Describes an error that occurred while parsing Narsese
+     */
+    public static class NarseseException extends RuntimeException {
+
+        /**
+         * An invalid addInput line.
+         *
+         * @param s type of error
+         */
+        public NarseseException(String s) {
+<span class="fc" id="L1303">            super(s);</span>
+<span class="fc" id="L1304">        }</span>
+
+        public NarseseException(String message, Throwable cause) {
+<span class="nc" id="L1307">            super(message, cause);</span>
+<span class="nc" id="L1308">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.4.201502262128</span></div></body></html>
