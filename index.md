@@ -1,5 +1,11 @@
 # NAL/NARchy
 
+[JavaDoc](doc) | [Build Info](project)
+
+**NARchy** derives from OpenNARS, the open-source version of [NARS](https://sites.google.com/site/narswang/home), a general-purpose AI system, designed in the framework of a reasoning system.
+
+Non-Axiomatic Reasoning System ([NARS](https://sites.google.com/site/narswang/home)) processes tasks imposed by its environment, which may include human users or other computer systems. Tasks can arrive at any time, and there is no restriction on their contents as far as they can be expressed in __Narsese__, the I/O language of NARS.
+
 ## TASK
 
 task ::= [budget] [term] [punct] [tense] [truth]
@@ -52,11 +58,12 @@ task ::= [budget] [term] [punct] [tense] [truth]
               <truth> ::= "%"<frequency>[";"<confidence>]"%" // two numbers in [0,1]x(0,1)
              <budget> ::= "$"<priority>[";"<durability>]"$"  // two numbers in [0,1]x(0,1)
                <word> : Unicode string in an arbitrary alphabet
+```
 
 ## VARIABLE
 
  - $X independent variable
- - #Y dependent variable
+ - \#Y dependent variable
  - ?Z query variable
  - %A pattern variable
              
@@ -347,18 +354,4 @@ cond(no)->op
 > - about **Sequence diagrams** syntax [here][7],
 > - about **Flow charts** syntax [here][8].
 
-### Support StackEdit
 
-[![](https://cdn.monetizejs.com/resources/button-32.png)](https://monetizejs.com/authorize?client_id=ESTHdCYOi18iLhhO&summary=true)
-
-  [^stackedit]: [StackEdit](https://stackedit.io/) is a full-featured, open-source Markdown editor based on PageDown, the Markdown library used by Stack Overflow and the other Stack Exchange sites.
-
-
-  [1]: http://math.stackexchange.com/
-  [2]: http://daringfireball.net/projects/markdown/syntax "Markdown"
-  [3]: https://github.com/jmcmanus/pagedown-extra "Pagedown Extra"
-  [4]: http://meta.math.stackexchange.com/questions/5020/mathjax-basic-tutorial-and-quick-reference
-  [5]: https://code.google.com/p/google-code-prettify/
-  [6]: http://highlightjs.org/
-  [7]: http://bramp.github.io/js-sequence-diagrams/
-  [8]: http://adrai.github.io/flowchart.js/
